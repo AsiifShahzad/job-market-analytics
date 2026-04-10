@@ -251,7 +251,9 @@ async def save_jobs_to_db(db: AsyncSession, jobs: List[Dict]) -> Dict:
             
             # Extract and link skills
             try:
-                skills_found = extract_skills(job_data["description"], job_data["title"])
+                # Extract skills - returns ExtractedSkills object with all_skills, required_skills, preferred_skills
+                extracted_skills = extract_skills(job_data["title"], job_data["description"])
+                skills_found = extracted_skills.all_skills
                 
                 for skill_name in skills_found:
                     # Get or create skill
