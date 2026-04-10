@@ -126,7 +126,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 async def lifespan_context():
     """
     Application lifespan manager: performs health check on startup.
-    Creates tables as needed (but with timeout to avoid hanging).
+    Creates tables as needed (with longer timeout for Neon cold-start).
     """
     db_connected = False
     
@@ -136,11 +136,11 @@ async def lifespan_context():
         import asyncio
         from sqlalchemy import text
         
-        # Simple connection test
+        # Simple connection test with longer timeout for Neon cold-start
         async with async_session_maker() as session:
             await asyncio.wait_for(
                 session.execute(text("SELECT 1")),
-                timeout=5.0
+                timeout=15.0  # Increased from 5 to 15 seconds for Neon
             )
         
         db_connected = True
@@ -152,7 +152,7 @@ async def lifespan_context():
             async with async_engine.begin() as conn:
                 await asyncio.wait_for(
                     conn.run_sync(Base.metadata.create_all),
-                    timeout=10.0
+                    timeout=30.0  # Increased from 10 to 30 seconds
                 )
             logger.info("Database tables ready")
         except asyncio.TimeoutError:
@@ -161,7 +161,7 @@ async def lifespan_context():
             logger.warning(f"Failed to create database tables: {e}")
             
     except asyncio.TimeoutError:
-        logger.warning("Database connection test timed out, proceeding without DB")
+        logger.warning("Database connection test timed out after 15 seconds, proceeding without DB")
     except Exception as e:
         logger.warning(f"Database connection failed: {e}, proceeding without DB")
 
