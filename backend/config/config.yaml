@@ -1,0 +1,105 @@
+---
+# JobPulseAI Configuration
+# Production-grade configuration management
+
+environment: "development"  # development, staging, production
+
+# API Configuration
+api:
+  adzuna:
+    base_url: "https://api.adzuna.com/v1/api/jobs"
+    country: "us"
+    results_per_page: 50
+    max_pages: 20
+    rate_limit_delay: 1  # seconds between requests
+    timeout: 30  # seconds
+
+# Storage Configuration
+storage:
+  base_path: "data"
+  
+  # Partitioned storage structure
+  raw:
+    path: "data/raw"
+    format: "json"
+    partition_cols: ["year", "month", "day"]
+  
+  bronze:
+    path: "data/bronze/jobs_cleaned"
+    format: "parquet"
+    partition_cols: ["year", "month"]
+  
+  silver:
+    path: "data/silver/jobs_with_skills"
+    format: "parquet"
+    partition_cols: ["year", "month"]
+  
+  gold:
+    path: "data/gold/jobs_features"
+    format: "parquet"
+    partition_cols: ["year", "month"]
+  
+  analytics:
+    path: "data/analytics"
+    format: "parquet"
+  
+  ml:
+    path: "data/ml"
+    format: "parquet"
+
+# Prefect Configuration
+prefect:
+  flow_name: "jobpulse-daily-pipeline"
+  
+  # Task retry policies
+  retries:
+    ingestion: 3
+    cleaning: 2
+    skills: 2
+    features: 1
+    intelligence: 1
+  
+  # Task timeouts (seconds)
+  timeouts:
+    ingestion: 600
+    cleaning: 300
+    skills: 600
+    features: 300
+    intelligence: 300
+  
+  # Scheduling
+  schedule:
+    cron: "0 2 * * *"  # Daily at 2 AM UTC
+    timezone: "UTC"
+
+# Data Quality Thresholds
+quality:
+  min_records_per_run: 100
+  max_null_rate: 0.3
+  max_duplicate_rate: 0.1
+  min_skill_extraction_coverage: 0.7
+
+# Logging Configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "json"
+  handlers:
+    - "console"
+    - "file"
+  file:
+    path: "logs/jobpulse.log"
+    max_bytes: 10485760  # 10MB
+    backup_count: 5
+
+# Feature Engineering
+features:
+  temporal_windows: [7, 14, 30, 90]  # days for trend calculation
+  embedding_dim: 128
+  min_skill_frequency: 5
+
+# MLOps
+mlops:
+  feature_store_version: "v1"
+  enable_drift_detection: true
+  drift_threshold: 0.1
+  enable_monitoring: true
