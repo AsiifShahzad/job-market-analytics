@@ -1,0 +1,63 @@
+name: 🤖 Automated ETL Pipeline - Fetch Adzuna Jobs
+
+on:
+  schedule:
+    # Run every 6 hours: 00:00, 06:00, 12:00, 18:00 UTC
+    - cron: '0 */6 * * *'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  fetch-jobs:
+    runs-on: ubuntu-latest
+    name: Fetch and Process Jobs
+    
+    steps:
+      - name: 📥 Fetch jobs from Adzuna API
+        id: fetch
+        run: |
+          echo "🚀 Starting ETL Pipeline..."
+          
+          # Call the Render backend to fetch and process jobs
+          response=$(curl -s -X POST \
+            "https://job-market-analytics-p4sy.onrender.com/api/pipeline/run?pages=5" \
+            -H "Content-Type: application/json" \
+            -w "\n%{http_code}")
+          
+          # Extract status code (last line)
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          
+          echo "Status Code: $http_code"
+          echo "Response: $body"
+          
+          # Check if successful
+          if [ "$http_code" -eq 200 ] || [ "$http_code" -eq 201 ]; then
+            echo "✅ ETL Pipeline completed successfully!"
+            echo "result=success" >> $GITHUB_OUTPUT
+            
+            # Extract job count from response
+            jobs_inserted=$(echo "$body" | grep -o '"jobs_inserted":[0-9]*' | grep -o '[0-9]*' || echo "unknown")
+            echo "📊 Jobs inserted: $jobs_inserted"
+            
+          else
+            echo "❌ ETL Pipeline failed with status: $http_code"
+            echo "result=failed" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+      
+      - name: 📧 Send Slack notification (Optional)
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: '❌ ETL Pipeline failed! Check logs.'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        continue-on-error: true
+      
+      - name: ✅ Pipeline Complete
+        run: |
+          echo "🎉 ETL Pipeline run completed!"
+          echo "📊 Your dashboard is now updated with fresh Adzuna job data"
+          echo "🔗 Dashboard: https://job-market-analytics-p4sy.onrender.com"
