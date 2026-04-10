@@ -74,10 +74,23 @@ def create_app() -> FastAPI:
         openapi_url="/api/openapi.json"
     )
 
-    # CORS configuration - allow frontend on localhost:5173
+    # CORS configuration - allow frontend on localhost and production URLs
+    allowed_origins = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "https://job-market-analytics-p4sy.onrender.com",
+    ]
+    
+    # Add environment-specific origins
+    env = os.getenv("ENVIRONMENT", "development")
+    if env == "production":
+        # Add any production frontend URLs here
+        pass
+    
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173", "http://localhost:3000"],
+        allow_origins=allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
