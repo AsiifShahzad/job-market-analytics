@@ -80,6 +80,7 @@ def create_app() -> FastAPI:
         "http://localhost:3000",
         "http://localhost:8000",
         "https://job-market-analytics-p4sy.onrender.com",
+        "https://job-market-analytics-omega.vercel.app",
     ]
     
     # Add environment-specific origins
