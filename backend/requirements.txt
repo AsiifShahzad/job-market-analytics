@@ -20,3 +20,5 @@ pycountry==23.12.11
 python-multipart==0.0.6
 aiosqlite==0.22.1
 gunicorn==21.2.0
+prefect>=2.14.0
+prefect-sqlalchemy>=0.2.0

@@ -9,12 +9,12 @@ import requests
 import time
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, insert
+from sqlalchemy import select, func, insert, delete
 from datetime import datetime
 from typing import Dict, List
 
 from src.db.session import get_db
-from src.db.models import Job, Skill, JobSkill, PipelineRun, Base
+from src.db.models import Job, Skill, JobSkill, PipelineRun, SkillSnapshot, Base
 from src.nlp.skill_extractor import extract_skills
 
 logger = structlog.get_logger(__name__)
@@ -291,4 +291,39 @@ async def get_pipeline_status(db: AsyncSession = Depends(get_db)):
         return {
             "status": "error",
             "message": str(e),
+        }
+
+
+@router.delete("/reset")
+async def reset_database(db: AsyncSession = Depends(get_db)):
+    """
+    ⚠️ DANGER: Delete all data from database
+    Use only to clear sample/test data
+    """
+    try:
+        logger.warning("Database reset requested - deleting all data")
+        
+        # Delete all data in reverse dependency order using SQLAlchemy ORM
+        await db.execute(delete(JobSkill))
+        await db.execute(delete(SkillSnapshot))
+        await db.execute(delete(Job))
+        await db.execute(delete(Skill))
+        await db.execute(delete(PipelineRun))
+        
+        await db.commit()
+        
+        logger.warning("Database reset completed - all data deleted")
+        
+        return {
+            "status": "success",
+            "message": "Database reset completed - all data deleted",
+            "timestamp": datetime.now().isoformat(),
+        }
+        
+    except Exception as e:
+        logger.error(f"Database reset failed: {str(e)}")
+        await db.rollback()
+        return {
+            "status": "error",
+            "message": f"Reset failed: {str(e)}",
         }
