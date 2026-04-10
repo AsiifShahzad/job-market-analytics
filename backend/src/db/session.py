@@ -60,8 +60,8 @@ def create_engine() -> AsyncEngine:
                     "application_name": "jobpulse-ai",
                     "jit": "off",  # Disable JIT for Neon
                 },
-                "timeout": 5,  # 5 second connection timeout
-                "command_timeout": 10,  # 10 second command timeout
+                "timeout": 15,  # 15 second connection timeout for Neon cold-start
+                "command_timeout": 30,  # 30 second command timeout
             }
         )
     return engine
@@ -84,17 +84,33 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     FastAPI dependency: provides an AsyncSession for route handlers.
     Automatically commits on success, rolls back on exception.
     Has timeout protection to prevent hanging.
+    Handles Neon cold-start issues with better error messages.
     """
     import asyncio
     try:
         # Create session with timeout
         async with async_session_maker() as session:
             try:
+                # Test connection before yielding
+                await session.execute(__import__('sqlalchemy').text("SELECT 1"))
                 yield session
                 await session.commit()
             except Exception as e:
                 await session.rollback()
-                logger.error("Database session error", error=str(e), exc_info=True)
+                error_str = str(e).lower()
+                
+                # Provide helpful error messages for common issues
+                if 'timeout' in error_str or 'connection refused' in error_str or 'network' in error_str:
+                    logger.error(
+                        "Database connection timeout or network error - Neon may be cold-starting",
+                        error=str(e),
+                        exc_info=True
+                    )
+                elif 'neon' in error_str or 'branch' in error_str:
+                    logger.error("Neon-specific database error", error=str(e), exc_info=True)
+                else:
+                    logger.error("Database session error", error=str(e), exc_info=True)
+                
                 raise
             finally:
                 await session.close()
