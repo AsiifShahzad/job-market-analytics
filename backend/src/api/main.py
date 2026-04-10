@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.session import get_db, lifespan_context, async_engine, async_session_maker
 from src.db.models import Base
-from src.api.routes import skills, salaries, pipeline, trends, adzuna_direct, jobs
+from src.api.routes import skills, salaries, pipeline, trends, adzuna_direct, jobs, pipeline_trigger
 from src.api.schemas import HealthResponse
 from src.api.cache import get_cache_stats, clear_cache
 
@@ -101,6 +101,7 @@ def create_app() -> FastAPI:
     app.include_router(skills.router)
     app.include_router(salaries.router)
     app.include_router(pipeline.router)
+    app.include_router(pipeline_trigger.router)  # Real ETL pipeline trigger
     app.include_router(trends.router)
     app.include_router(adzuna_direct.router)  # Direct Adzuna endpoints
     app.include_router(jobs.router)  # Jobs from database
