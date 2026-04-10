@@ -9,6 +9,10 @@ import os
 import sys
 from pathlib import Path
 
+# Load .env file FIRST
+from dotenv import load_dotenv
+load_dotenv()  # Load from backend/.env
+
 # Add backend directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 

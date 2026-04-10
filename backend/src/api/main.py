@@ -8,6 +8,10 @@ import sys
 from contextlib import asynccontextmanager
 from datetime import datetime
 
+# Load environment variables FIRST
+from dotenv import load_dotenv
+load_dotenv()  # Load from backend/.env
+
 # Add backend directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
