@@ -9,7 +9,7 @@ import requests
 import time
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, insert, delete
+from sqlalchemy import select, func, insert, delete, desc
 from datetime import datetime
 from typing import Dict, List
 
@@ -35,17 +35,32 @@ async def run_pipeline(
     2. Clean and normalize data
     3. Extract skills using NLP
     4. Save to database
-    5. Return statistics
+    5. Log execution to pipeline_run table
+    6. Return statistics
     """
+    # Create pipeline run record
+    pipeline_run = PipelineRun(
+        started_at=datetime.now(),
+        status="running",
+    )
+    db.add(pipeline_run)
+    await db.flush()  # Get the ID before committing
+    
     try:
-        logger.info("Pipeline started", pages=pages)
+        logger.info("Pipeline started", pages=pages, run_id=pipeline_run.id)
         
         # Step 1: Fetch from Adzuna
         logger.info("Step 1: Fetching jobs from Adzuna API")
         raw_jobs = await fetch_adzuna_jobs(pages)
+        pipeline_run.jobs_fetched = len(raw_jobs)
         logger.info(f"Fetched {len(raw_jobs)} jobs from Adzuna")
         
         if not raw_jobs:
+            pipeline_run.status = "failed"
+            pipeline_run.finished_at = datetime.now()
+            pipeline_run.error_message = "No jobs fetched from Adzuna API"
+            await db.commit()
+            
             return {
                 "status": "error",
                 "message": "No jobs fetched from Adzuna API",
@@ -61,21 +76,35 @@ async def run_pipeline(
         logger.info("Step 3: Extracting skills and saving to database")
         stats = await save_jobs_to_db(db, cleaned_jobs)
         
-        logger.info("Pipeline completed successfully", **stats)
+        # Update pipeline run with stats
+        pipeline_run.jobs_inserted = stats["jobs_inserted"]
+        pipeline_run.jobs_skipped = stats["duplicates_skipped"]
+        pipeline_run.status = "success"
+        pipeline_run.finished_at = datetime.now()
+        await db.commit()
+        
+        logger.info("Pipeline completed successfully", run_id=pipeline_run.id, **stats)
         
         return {
             "status": "success",
             "message": "Pipeline completed successfully",
+            "run_id": pipeline_run.id,
             "statistics": stats,
             "timestamp": datetime.now().isoformat(),
         }
         
     except Exception as e:
-        logger.error("Pipeline failed", error=str(e))
+        logger.error("Pipeline failed", run_id=pipeline_run.id, error=str(e))
+        pipeline_run.status = "failed"
+        pipeline_run.finished_at = datetime.now()
+        pipeline_run.error_message = str(e)
+        await db.commit()
+        
         return {
             "status": "error",
             "message": f"Pipeline failed: {str(e)}",
             "error": str(e),
+            "run_id": pipeline_run.id,
         }
 
 
