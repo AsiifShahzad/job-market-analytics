@@ -122,6 +122,34 @@ def create_app() -> FastAPI:
             cache_stats=get_cache_stats()
         )
 
+    # Database connectivity test endpoint
+    @app.get("/api/health/db")
+    async def health_check_db(db: AsyncSession = Depends(get_db)):
+        """
+        Test database connectivity.
+        Returns database status or error details.
+        """
+        try:
+            # Simple query to test connection
+            from sqlalchemy import text
+            result = await db.execute(text("SELECT 1"))
+            row = result.scalar()
+            
+            return {
+                "status": "healthy",
+                "database": "connected",
+                "message": "Database is accessible",
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        except Exception as e:
+            logger.error(f"Database health check failed: {str(e)}", exc_info=True)
+            return {
+                "status": "unhealthy",
+                "database": "disconnected",
+                "message": str(e),
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+
     # Utility endpoints
     @app.post("/api/cache/clear")
     async def clear_response_cache():
