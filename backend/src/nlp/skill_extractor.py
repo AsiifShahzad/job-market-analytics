@@ -1,337 +1,303 @@
 """
-NLP-based skill extraction with taxonomy and required/preferred categorization.
-Replaces regex-only approach with language-aware pattern matching and JD section detection.
+Skill extractor — pure whitelist approach.
+
+NO spaCy, NO ML classifier, NO candidate detection.
+Only matches skills from a hardcoded technical whitelist.
+Soft skills (leadership, communication, etc.) are completely excluded.
+
+This guarantees only real technical skills appear in the output:
+Python, AWS, React, Docker, SQL, etc.
 """
 
 import re
+import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
-import structlog
+from typing import List, Dict
 
-logger = structlog.get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
-# Comprehensive skill taxonomy (80+ skills across 6 categories)
-SKILL_TAXONOMY = {
-    # Languages
-    "python": {"category": "language", "aliases": ["python", "py", "python3", "python 3"]},
-    "typescript": {"category": "language", "aliases": ["typescript", "ts"]},
-    "javascript": {"category": "language", "aliases": ["javascript", "js", "node.js", "nodejs", "es6", "es2020"]},
-    "java": {"category": "language", "aliases": ["java"]},
-    "csharp": {"category": "language", "aliases": ["c#", "csharp", "c sharp", ".net"]},
-    "go": {"category": "language", "aliases": ["golang", "go lang"]},
-    "rust": {"category": "language", "aliases": ["rust", "rustlang"]},
-    "scala": {"category": "language", "aliases": ["scala"]},
-    "r": {"category": "language", "aliases": ["\\br\\b", "r language", "r programming"]},
-    "sql": {"category": "language", "aliases": ["sql", "tsql", "plsql", "t-sql"]},
-    "bash": {"category": "language", "aliases": ["bash", "shell", "zsh", "shellscript"]},
-    "php": {"category": "language", "aliases": ["php"]},
-    "ruby": {"category": "language", "aliases": ["ruby", "rails", "rubyonrails"]},
-    "kotlin": {"category": "language", "aliases": ["kotlin"]},
-    "swift": {"category": "language", "aliases": ["swift"]},
-    "c++": {"category": "language", "aliases": ["c\\+\\+", "cpp"]},
-    
-    # Frontend Frameworks & Libraries
-    "react": {"category": "framework", "aliases": ["react", "reactjs", "react.js", "reactnative"]},
-    "vue": {"category": "framework", "aliases": ["vue", "vuejs", "vue.js"]},
-    "angular": {"category": "framework", "aliases": ["angular", "angularjs"]},
-    "nextjs": {"category": "framework", "aliases": ["next.js", "nextjs", "next", "next js"]},
-    "gatsby": {"category": "framework", "aliases": ["gatsby"]},
-    "svelte": {"category": "framework", "aliases": ["svelte"]},
-    "html": {"category": "framework", "aliases": ["html", "html5", "html 5"]},
-    "css": {"category": "framework", "aliases": ["css", "css3", "tailwindcss", "tailwind", "bootstrap"]},
-    
-    # Backend Frameworks
-    "fastapi": {"category": "framework", "aliases": ["fastapi", "fast api"]},
-    "django": {"category": "framework", "aliases": ["django", "django rest"]},
-    "flask": {"category": "framework", "aliases": ["flask"]},
-    "spring": {"category": "framework", "aliases": ["spring", "spring boot", "springboot"]},
-    "express": {"category": "framework", "aliases": ["express", "express.js"]},
-    "nestjs": {"category": "framework", "aliases": ["nest.js", "nestjs", "nest"]},
-    "dotnet": {"category": "framework", "aliases": [".net", "dotnet", "asp.net", "asp net"]},
-    "graphql": {"category": "framework", "aliases": ["graphql", "graph ql"]},
-    "grpc": {"category": "framework", "aliases": ["grpc"]},
-    
-    # ML/AI Frameworks
-    "pytorch": {"category": "framework", "aliases": ["pytorch", "torch"]},
-    "tensorflow": {"category": "framework", "aliases": ["tensorflow", "tf"]},
-    "keras": {"category": "framework", "aliases": ["keras"]},
-    "huggingface": {"category": "framework", "aliases": ["huggingface", "hugging face"]},
-    "langchain": {"category": "framework", "aliases": ["langchain", "lang chain"]},
-    "transformers": {"category": "framework", "aliases": ["transformers", "gpt", "bert"]},
-    
-    # Cloud Platforms & Services
-    "aws": {"category": "cloud", "aliases": ["aws", "amazon", "amazon web services", "ec2", "lambda", "rds"]},
-    "gcp": {"category": "cloud", "aliases": ["gcp", "google cloud", "cloud.google", "bigquery"]},
-    "azure": {"category": "cloud", "aliases": ["azure", "microsoft azure", "cosmos db"]},
-    "heroku": {"category": "cloud", "aliases": ["heroku"]},
-    "vercel": {"category": "cloud", "aliases": ["vercel"]},
-    "netlify": {"category": "cloud", "aliases": ["netlify"]},
-    "digitalocean": {"category": "cloud", "aliases": ["digitalocean", "digital ocean"]},
-    
-    # Databases
-    "postgresql": {"category": "data", "aliases": ["postgresql", "postgres", "pg", "psql"]},
-    "mysql": {"category": "data", "aliases": ["mysql"]},
-    "mongodb": {"category": "data", "aliases": ["mongodb", "mongo"]},
-    "dynamodb": {"category": "data", "aliases": ["dynamodb", "dynamo"]},
-    "cassandra": {"category": "data", "aliases": ["cassandra"]},
-    "redis": {"category": "data", "aliases": ["redis", "memcached"]},
-    "elasticsearch": {"category": "data", "aliases": ["elasticsearch", "elastic"]},
-    "snowflake": {"category": "data", "aliases": ["snowflake"]},
-    "bigquery": {"category": "data", "aliases": ["bigquery", "big query"]},
-    "redshift": {"category": "data", "aliases": ["redshift"]},
-    
-    # Data Processing & Pipelines
-    "spark": {"category": "data", "aliases": ["spark", "pyspark", "apache spark", "databricks"]},
-    "hadoop": {"category": "data", "aliases": ["hadoop", "hive"]},
-    "kafka": {"category": "data", "aliases": ["kafka", "apache kafka"]},
-    "airflow": {"category": "data", "aliases": ["airflow", "apache airflow", "dagster", "prefect"]},
-    "dbt": {"category": "data", "aliases": ["dbt", "data build tool"]},
-    "pandas": {"category": "data", "aliases": ["pandas", "pd"]},
-    "numpy": {"category": "data", "aliases": ["numpy", "np"]},
-    "scikit-learn": {"category": "data", "aliases": ["scikit-learn", "sklearn", "scikit learn"]},
-    "jupyter": {"category": "data", "aliases": ["jupyter", "notebook", "jupyter notebook"]},
-    "plotly": {"category": "data", "aliases": ["plotly"]},
-    "seaborn": {"category": "data", "aliases": ["seaborn"]},
-    "matplotlib": {"category": "data", "aliases": ["matplotlib"]},
-    
-    # DevOps & Infrastructure
-    "docker": {"category": "tool", "aliases": ["docker", "dockerfile"]},
-    "kubernetes": {"category": "tool", "aliases": ["kubernetes", "k8s"]},
-    "terraform": {"category": "tool", "aliases": ["terraform", "hcl"]},
-    "ansible": {"category": "tool", "aliases": ["ansible"]},
-    "git": {"category": "tool", "aliases": ["git", "github", "gitlab", "bitbucket"]},
-    "jenkins": {"category": "tool", "aliases": ["jenkins"]},
-    "circleci": {"category": "tool", "aliases": ["circle ci", "circleci"]},
-    "github": {"category": "tool", "aliases": ["github", "github actions"]},
-    "gitlab": {"category": "tool", "aliases": ["gitlab", "gitlab ci"]},
-    "nginx": {"category": "tool", "aliases": ["nginx"]},
-    "apache": {"category": "tool", "aliases": ["apache"]},
-    
-    # Soft Skills / Competencies
-    "communication": {"category": "soft", "aliases": ["communication", "communicative", "written communication"]},
-    "teamwork": {"category": "soft", "aliases": ["teamwork", "team player", "collaboration", "collaborative"]},
-    "leadership": {"category": "soft", "aliases": ["leadership", "leader", "lead"]},
-    "problem-solving": {"category": "soft", "aliases": ["problem solving", "problem-solving", "analytical"]},
-    "agile": {"category": "soft", "aliases": ["agile", "scrum", "kanban"]},
-    "mentoring": {"category": "soft", "aliases": ["mentoring", "mentor"]},
+# ── Technical skills whitelist ────────────────────────────────────────────────
+# Format: "Display Name": {"cat": "category", "aliases": ["alias1", "alias2"]}
+# Aliases matched case-insensitively as whole words.
+# Soft skills, company names, and generic terms are intentionally excluded.
+
+SKILLS_WHITELIST: Dict[str, Dict] = {
+
+    # ── Languages ──────────────────────────────────────────────────────────────
+    "Python":       {"cat": "language", "aliases": ["python", "python3", "python 3"]},
+    "JavaScript":   {"cat": "language", "aliases": ["javascript", "java script", "es6", "ecmascript"]},
+    "TypeScript":   {"cat": "language", "aliases": ["typescript"]},
+    "Java":         {"cat": "language", "aliases": ["java"]},
+    "Go":           {"cat": "language", "aliases": ["golang", "go lang"]},
+    "Rust":         {"cat": "language", "aliases": ["rust lang", "rust programming"]},
+    "C++":          {"cat": "language", "aliases": ["c++", "cpp", "c plus plus"]},
+    "C#":           {"cat": "language", "aliases": ["c#", "csharp", "c sharp"]},
+    "PHP":          {"cat": "language", "aliases": ["php"]},
+    "Ruby":         {"cat": "language", "aliases": ["ruby on rails", "ror"]},
+    "Swift":        {"cat": "language", "aliases": ["swift", "swiftui"]},
+    "Kotlin":       {"cat": "language", "aliases": ["kotlin"]},
+    "Scala":        {"cat": "language", "aliases": ["scala"]},
+    "R":            {"cat": "language", "aliases": ["r programming", "r language", "rstudio"]},
+    "SQL":          {"cat": "language", "aliases": ["sql", "t-sql", "tsql", "pl/sql"]},
+    "Bash":         {"cat": "language", "aliases": ["bash", "shell scripting", "shell script"]},
+    "MATLAB":       {"cat": "language", "aliases": ["matlab"]},
+    "Elixir":       {"cat": "language", "aliases": ["elixir"]},
+    "Haskell":      {"cat": "language", "aliases": ["haskell"]},
+    "Dart":         {"cat": "language", "aliases": ["dart"]},
+    "Lua":          {"cat": "language", "aliases": ["lua"]},
+    "Perl":         {"cat": "language", "aliases": ["perl"]},
+    "Assembly":     {"cat": "language", "aliases": ["assembly language", "asm"]},
+
+    # ── Web Frameworks ─────────────────────────────────────────────────────────
+    "React":        {"cat": "framework", "aliases": ["react", "reactjs", "react.js"]},
+    "Next.js":      {"cat": "framework", "aliases": ["next.js", "nextjs", "next js"]},
+    "Vue":          {"cat": "framework", "aliases": ["vue.js", "vuejs", "nuxt.js", "nuxtjs"]},
+    "Angular":      {"cat": "framework", "aliases": ["angular", "angularjs"]},
+    "Svelte":       {"cat": "framework", "aliases": ["svelte", "sveltekit"]},
+    "FastAPI":      {"cat": "framework", "aliases": ["fastapi", "fast api"]},
+    "Django":       {"cat": "framework", "aliases": ["django", "django rest framework", "drf"]},
+    "Flask":        {"cat": "framework", "aliases": ["flask"]},
+    "Spring Boot":  {"cat": "framework", "aliases": ["spring boot", "spring framework", "spring mvc"]},
+    "Express":      {"cat": "framework", "aliases": ["express.js", "expressjs"]},
+    "NestJS":       {"cat": "framework", "aliases": ["nestjs", "nest.js"]},
+    "Node.js":      {"cat": "framework", "aliases": ["node.js", "nodejs"]},
+    "GraphQL":      {"cat": "framework", "aliases": ["graphql", "apollo graphql"]},
+    "gRPC":         {"cat": "framework", "aliases": ["grpc", "protobuf", "protocol buffers"]},
+    "REST API":     {"cat": "framework", "aliases": ["rest api", "restful api"]},
+    "Tailwind CSS": {"cat": "framework", "aliases": ["tailwind css", "tailwindcss"]},
+    "Laravel":      {"cat": "framework", "aliases": ["laravel"]},
+    ".NET":         {"cat": "framework", "aliases": [".net core", "asp.net", "dotnet"]},
+    "Redux":        {"cat": "framework", "aliases": ["redux", "redux toolkit"]},
+    "jQuery":       {"cat": "framework", "aliases": ["jquery"]},
+    "Flutter":      {"cat": "framework", "aliases": ["flutter"]},
+    "React Native": {"cat": "framework", "aliases": ["react native"]},
+    "Electron":     {"cat": "framework", "aliases": ["electron.js", "electronjs"]},
+
+    # ── Cloud ──────────────────────────────────────────────────────────────────
+    "AWS":          {"cat": "cloud", "aliases": ["aws", "amazon web services", "ec2", "s3 bucket", "aws lambda", "eks", "ecs", "cloudformation", "sagemaker", "cloudwatch"]},
+    "Google Cloud": {"cat": "cloud", "aliases": ["gcp", "google cloud platform", "cloud run", "gke", "google kubernetes engine", "cloud functions"]},
+    "Azure":        {"cat": "cloud", "aliases": ["microsoft azure", "azure devops", "azure functions", "aks", "azure kubernetes"]},
+    "Vercel":       {"cat": "cloud", "aliases": ["vercel"]},
+    "Heroku":       {"cat": "cloud", "aliases": ["heroku"]},
+    "Cloudflare":   {"cat": "cloud", "aliases": ["cloudflare workers"]},
+    "Netlify":      {"cat": "cloud", "aliases": ["netlify"]},
+    "DigitalOcean": {"cat": "cloud", "aliases": ["digitalocean", "digital ocean"]},
+
+    # ── Databases ──────────────────────────────────────────────────────────────
+    "PostgreSQL":    {"cat": "data", "aliases": ["postgresql", "postgres"]},
+    "MySQL":         {"cat": "data", "aliases": ["mysql", "mariadb"]},
+    "MongoDB":       {"cat": "data", "aliases": ["mongodb", "mongo db"]},
+    "Redis":         {"cat": "data", "aliases": ["redis"]},
+    "Elasticsearch": {"cat": "data", "aliases": ["elasticsearch", "elastic search", "opensearch", "elk stack"]},
+    "Snowflake":     {"cat": "data", "aliases": ["snowflake"]},
+    "BigQuery":      {"cat": "data", "aliases": ["bigquery", "big query"]},
+    "Cassandra":     {"cat": "data", "aliases": ["cassandra", "apache cassandra"]},
+    "DynamoDB":      {"cat": "data", "aliases": ["dynamodb"]},
+    "SQLite":        {"cat": "data", "aliases": ["sqlite"]},
+    "Neo4j":         {"cat": "data", "aliases": ["neo4j"]},
+    "Supabase":      {"cat": "data", "aliases": ["supabase"]},
+    "Firebase":      {"cat": "data", "aliases": ["firebase", "firestore"]},
+    "Oracle DB":     {"cat": "data", "aliases": ["oracle database", "oracle db"]},
+
+    # ── Data & ML ──────────────────────────────────────────────────────────────
+    "Pandas":            {"cat": "data", "aliases": ["pandas"]},
+    "NumPy":             {"cat": "data", "aliases": ["numpy"]},
+    "Apache Spark":      {"cat": "data", "aliases": ["apache spark", "pyspark", "spark sql"]},
+    "Apache Kafka":      {"cat": "data", "aliases": ["apache kafka", "kafka streams"]},
+    "Apache Airflow":    {"cat": "data", "aliases": ["apache airflow"]},
+    "dbt":               {"cat": "data", "aliases": ["dbt", "data build tool"]},
+    "TensorFlow":        {"cat": "data", "aliases": ["tensorflow", "keras"]},
+    "PyTorch":           {"cat": "data", "aliases": ["pytorch"]},
+    "scikit-learn":      {"cat": "data", "aliases": ["scikit-learn", "sklearn", "scikit learn"]},
+    "Hugging Face":      {"cat": "data", "aliases": ["hugging face", "huggingface"]},
+    "LangChain":         {"cat": "data", "aliases": ["langchain"]},
+    "Machine Learning":  {"cat": "data", "aliases": ["machine learning"]},
+    "Deep Learning":     {"cat": "data", "aliases": ["deep learning", "neural networks"]},
+    "NLP":               {"cat": "data", "aliases": ["natural language processing"]},
+    "Computer Vision":   {"cat": "data", "aliases": ["computer vision", "opencv", "object detection"]},
+    "MLOps":             {"cat": "data", "aliases": ["mlops", "mlflow", "kubeflow"]},
+    "Databricks":        {"cat": "data", "aliases": ["databricks"]},
+    "Tableau":           {"cat": "data", "aliases": ["tableau"]},
+    "Power BI":          {"cat": "data", "aliases": ["power bi", "powerbi"]},
+    "Looker":            {"cat": "data", "aliases": ["looker"]},
+    "Jupyter":           {"cat": "data", "aliases": ["jupyter", "jupyter notebook"]},
+    "Generative AI":     {"cat": "data", "aliases": ["generative ai", "gen ai", "llm", "large language model"]},
+
+    # ── DevOps & Tools ─────────────────────────────────────────────────────────
+    "Docker":          {"cat": "tool", "aliases": ["docker", "dockerfile", "docker compose", "docker-compose"]},
+    "Kubernetes":      {"cat": "tool", "aliases": ["kubernetes", "k8s", "kubectl", "helm"]},
+    "Terraform":       {"cat": "tool", "aliases": ["terraform", "terragrunt"]},
+    "Git":             {"cat": "tool", "aliases": ["git"]},
+    "GitHub":          {"cat": "tool", "aliases": ["github"]},
+    "GitHub Actions":  {"cat": "tool", "aliases": ["github actions"]},
+    "GitLab":          {"cat": "tool", "aliases": ["gitlab", "gitlab ci"]},
+    "CI/CD":           {"cat": "tool", "aliases": ["ci/cd", "continuous integration", "continuous delivery", "continuous deployment"]},
+    "Jenkins":         {"cat": "tool", "aliases": ["jenkins"]},
+    "Linux":           {"cat": "tool", "aliases": ["linux", "ubuntu", "debian", "centos"]},
+    "Ansible":         {"cat": "tool", "aliases": ["ansible"]},
+    "Prometheus":      {"cat": "tool", "aliases": ["prometheus"]},
+    "Grafana":         {"cat": "tool", "aliases": ["grafana"]},
+    "Datadog":         {"cat": "tool", "aliases": ["datadog"]},
+    "Nginx":           {"cat": "tool", "aliases": ["nginx"]},
+    "Celery":          {"cat": "tool", "aliases": ["celery"]},
+    "RabbitMQ":        {"cat": "tool", "aliases": ["rabbitmq", "rabbit mq"]},
+    "Webpack":         {"cat": "tool", "aliases": ["webpack"]},
+    "Vite":            {"cat": "tool", "aliases": ["vite"]},
+    "Jest":            {"cat": "tool", "aliases": ["jest"]},
+    "Cypress":         {"cat": "tool", "aliases": ["cypress"]},
+    "Selenium":        {"cat": "tool", "aliases": ["selenium"]},
+    "Postman":         {"cat": "tool", "aliases": ["postman"]},
+    "Jira":            {"cat": "tool", "aliases": ["jira"]},
+    "Figma":           {"cat": "tool", "aliases": ["figma"]},
+    "Xcode":           {"cat": "tool", "aliases": ["xcode"]},
+    "Android Studio":  {"cat": "tool", "aliases": ["android studio"]},
+    "Microservices":   {"cat": "tool", "aliases": ["microservices", "micro services", "service mesh"]},
+    "WebAssembly":     {"cat": "tool", "aliases": ["webassembly", "wasm"]},
+    "Agile/Scrum":     {"cat": "tool", "aliases": ["agile scrum", "scrum methodology"]},
+    "System Design":   {"cat": "tool", "aliases": ["system design", "distributed systems"]},
+    "iOS Dev":         {"cat": "platform", "aliases": ["ios development", "iphone development"]},
+    "Android Dev":     {"cat": "platform", "aliases": ["android development", "android sdk"]},
 }
+
+# ── Build lookup ──────────────────────────────────────────────────────────────
+# alias_lower → (canonical, category), sorted longest-first
+
+_ALIAS_MAP: Dict[str, tuple] = {}
+for _canonical, _info in SKILLS_WHITELIST.items():
+    for _alias in _info["aliases"]:
+        _ALIAS_MAP[_alias.lower()] = (_canonical, _info["cat"])
+
+_SORTED_ALIASES = sorted(_ALIAS_MAP.items(), key=lambda x: len(x[0]), reverse=True)
+
+
+# ── Data classes ──────────────────────────────────────────────────────────────
+
+@dataclass
+class ExtractedSkill:
+    name: str
+    category: str
+    requirement_level: str = "mentioned"
+    context_score: float = 0.3
+    years_required: int = 0
+    source: str = "whitelist"
+    classifier_confidence: float = 1.0
 
 
 @dataclass
-class ExtractedSkills:
-    """Structured output from skill extraction."""
+class ExtractionResult:
+    all_skills: List[str]
     required_skills: List[str]
     preferred_skills: List[str]
-    all_skills: List[str]
-    raw_matches: Dict[str, int]
-    seniority_level: str
-    is_remote: bool
+    details: List[ExtractedSkill]
+    skill_count: int = 0
+
+    def __post_init__(self):
+        self.skill_count = len(self.all_skills)
 
 
-# Job Description Section Detection Markers
-REQUIRED_MARKERS = {
-    r"\brequired\b",
-    r"\bmust have\b",
-    r"\brequired skills?\b",
-    r"\bnecessary skills?\b",
-    r"\bmandatory\b",
-    r"\bqualifications?\b",
-    r"\brequirements?\b",
-}
+# ── Context signals ───────────────────────────────────────────────────────────
 
-PREFERRED_MARKERS = {
-    r"\bpreferred\b",
-    r"\bnice to have\b",
-    r"\bdesirable\b",
-    r"\bbonus\b",
-    r"\ba plus\b",
-    r"\bwould be great\b",
-}
-
-SENIORITY_PATTERNS = {
-    "junior": r"\b(junior|jr\.?|entry.?level|0-2 years?|graduate)\b",
-    "mid": r"\b(mid.?level|intermediate|senior|3-6 years?|5-7 years?)\b",
-    "senior": r"\b(senior|staff|lead|tech lead|principal|architect|7\+ years?|10+ years?)\b",
-}
-
-REMOTE_MARKERS = {
-    r"\bremote\b",
-    r"\bwork from home\b",
-    r"\bwfh\b",
-    r"\bdistributed\b",
-    r"\basynchronous\b",
-}
+_REQUIRED_RE = re.compile(
+    r"\b(must have|required|mandatory|essential|proficient in|"
+    r"expertise in|strong experience|proven experience|hands.on|"
+    r"expert in|deep knowledge|minimum \d+ years?)\b",
+    re.IGNORECASE,
+)
+_PREFERRED_RE = re.compile(
+    r"\b(preferred|nice to have|bonus|plus|advantageous|desirable|"
+    r"ideally|familiarity with|exposure to|is a plus)\b",
+    re.IGNORECASE,
+)
 
 
-def split_jd_sections(description: str) -> Dict[str, str]:
-    """
-    Split job description into required/preferred skills sections.
-    
-    Args:
-        description: Full job description text
-        
-    Returns:
-        Dict with 'required', 'preferred', 'general' sections
-    """
-    sections = {
-        "required": "",
-        "preferred": "",
-        "general": description,
-    }
-    
-    lines = description.split("\n")
-    current_section = "general"
-    section_content = []
-    
-    for line in lines:
-        line_lower = line.lower()
-        
-        # Check for section markers
-        if any(re.search(marker, line_lower) for marker in REQUIRED_MARKERS):
-            if section_content:
-                sections[current_section] = "\n".join(section_content)
-                section_content = []
-            current_section = "required"
-            logger.debug("detected_required_section", line_sample=line[:50])
+def _get_requirement_level(description: str, alias: str) -> tuple:
+    """Check sentence context around alias. Returns (level, score)."""
+    try:
+        alias_re = re.compile(r"\b" + re.escape(alias) + r"\b", re.IGNORECASE)
+    except re.error:
+        return "mentioned", 0.3
+
+    for sentence in re.split(r"[.!\n;]+", description):
+        if not alias_re.search(sentence):
             continue
-            
-        if any(re.search(marker, line_lower) for marker in PREFERRED_MARKERS):
-            if section_content:
-                sections[current_section] = "\n".join(section_content)
-                section_content = []
-            current_section = "preferred"
-            logger.debug("detected_preferred_section", line_sample=line[:50])
-            continue
-            
-        section_content.append(line)
-    
-    # Store final section
-    if section_content:
-        sections[current_section] = "\n".join(section_content)
-    
-    return sections
+        if _REQUIRED_RE.search(sentence):
+            return "required", 0.8
+        if _PREFERRED_RE.search(sentence):
+            return "preferred", 0.5
+
+    return "mentioned", 0.3
 
 
-def extract_seniority(title: str, description: str) -> str:
-    """
-    Extract seniority level from title and description.
-    
-    Args:
-        title: Job title
-        description: Job description
-        
-    Returns:
-        Seniority level: 'junior', 'mid', or 'senior'
-    """
-    combined_text = f"{title} {description}".lower()
-    
-    # Check seniority patterns in order (senior > mid > junior)
-    for level in ["senior", "mid", "junior"]:
-        if re.search(SENIORITY_PATTERNS[level], combined_text):
-            return level
-    
-    # Default to mid if unable to determine
-    return "mid"
+# ── Main extractor ────────────────────────────────────────────────────────────
 
-
-def is_remote_opportunity(description: str) -> bool:
+def extract_skills(title: str, description: str) -> ExtractionResult:
     """
-    Detect if job allows remote work.
-    
-    Args:
-        description: Job description text
-        
-    Returns:
-        True if remote work is mentioned
+    Extract technical skills using pure whitelist matching.
+    Only returns skills explicitly listed in SKILLS_WHITELIST.
+    Guarantees no company names, state codes, or soft skills in output.
     """
-    description_lower = description.lower()
-    return any(re.search(marker, description_lower) for marker in REMOTE_MARKERS)
-
-
-def extract_skills_from_text(text: str) -> Tuple[List[str], Dict[str, int]]:
-    """
-    Extract skills from text using taxonomy matching.
-    
-    Args:
-        text: Text to search for skills
-        
-    Returns:
-        Tuple of (skill_list, raw_match_counts)
-    """
-    skills_found = []
-    match_counts = {}
+    text = f"{title}\n\n{description}"
     text_lower = text.lower()
-    
-    for skill_name, skill_info in SKILL_TAXONOMY.items():
-        aliases = skill_info["aliases"]
-        for alias in aliases:
-            # Case-insensitive regex match with word boundaries
-            pattern = rf"\b{re.escape(alias)}\b"
-            matches = len(re.findall(pattern, text_lower))
-            
-            if matches > 0:
-                skills_found.append(skill_name)
-                match_counts[skill_name] = match_counts.get(skill_name, 0) + matches
-                logger.debug(
-                    "skill_matched",
-                    skill=skill_name,
-                    alias=alias,
-                    match_count=matches,
+
+    found: Dict[str, ExtractedSkill] = {}
+    matched_spans: set = set()
+
+    for alias_lower, (canonical, category) in _SORTED_ALIASES:
+        try:
+            escaped = re.escape(alias_lower)
+            first_char = alias_lower[0]
+            last_char = alias_lower[-1]
+            prefix = r"\b" if re.match(r"\w", first_char) else r"(?<![.\w])"
+            suffix = r"\b" if re.match(r"\w", last_char) else r"(?![.\w])"
+            pattern = re.compile(prefix + escaped + suffix, re.IGNORECASE)
+        except re.error:
+            continue
+
+        for match in pattern.finditer(text_lower):
+            start, end = match.start(), match.end()
+
+            # Skip spans already covered by a longer match
+            if any(not (end <= s or start >= e) for s, e in matched_spans):
+                continue
+
+            matched_spans.add((start, end))
+
+            if canonical not in found:
+                level, score = _get_requirement_level(description, alias_lower)
+                found[canonical] = ExtractedSkill(
+                    name=canonical,
+                    category=category,
+                    requirement_level=level,
+                    context_score=score,
                 )
-    
-    # Deduplicate while preserving order
-    unique_skills = list(dict.fromkeys(skills_found))
-    return unique_skills, match_counts
+            else:
+                level, score = _get_requirement_level(description, alias_lower)
+                if score > found[canonical].context_score:
+                    found[canonical].context_score = score
+                    found[canonical].requirement_level = level
+
+    details = sorted(found.values(), key=lambda s: s.context_score, reverse=True)
+    all_skills = [s.name for s in details]
+    required   = [s.name for s in details if s.requirement_level == "required"]
+    preferred  = [s.name for s in details if s.requirement_level in ("preferred", "nice_to_have")]
+
+    logger.debug("Whitelist extraction: total=%d required=%d", len(all_skills), len(required))
+
+    return ExtractionResult(
+        all_skills=all_skills,
+        required_skills=required,
+        preferred_skills=preferred,
+        details=details,
+    )
 
 
-def extract_skills(
-    title: str,
-    description: str,
-    log_context: Optional[Dict] = None,
-) -> ExtractedSkills:
-    """
-    Extract skills, seniority, and remote status from job posting.
-    
-    Args:
-        title: Job title
-        description: Job description
-        log_context: Optional logging context (e.g., job_id)
-        
-    Returns:
-        ExtractedSkills dataclass with all fields populated
-    """
-    logger.info("skill_extraction_started", title_length=len(title), desc_length=len(description))
-    
-    # Split into required/preferred sections
-    sections = split_jd_sections(description)
-    
-    # Extract skills from each section
-    required_skills, required_matches = extract_skills_from_text(sections["required"])
-    preferred_skills, preferred_matches = extract_skills_from_text(sections["preferred"])
-    all_text_skills, all_matches = extract_skills_from_text(description)
-    
-    # Extract auxiliary features
-    seniority = extract_seniority(title, description)
-    is_remote = is_remote_opportunity(description)
-    
-    # Combine matches
-    combined_matches = {**required_matches, **preferred_matches, **all_matches}
-    
-    logger.info(
-        "skill_extraction_completed",
-        required_count=len(required_skills),
-        preferred_count=len(preferred_skills),
-        total_unique=len(all_text_skills),
-        seniority=seniority,
-        is_remote=is_remote,
-    )
-    
-    return ExtractedSkills(
-        required_skills=required_skills,
-        preferred_skills=preferred_skills,
-        all_skills=all_text_skills,
-        raw_matches=combined_matches,
-        seniority_level=seniority,
-        is_remote=is_remote,
-    )
+# ── Compatibility shims ───────────────────────────────────────────────────────
+
+def get_skill_names(title: str, description: str) -> List[str]:
+    return extract_skills(title, description).all_skills
+
+
+def get_category(skill_name: str) -> str:
+    entry = SKILLS_WHITELIST.get(skill_name)
+    return entry["cat"] if entry else "tool"

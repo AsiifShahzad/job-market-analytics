@@ -6,7 +6,7 @@ import {
   usePipelineLogsSSE,
 } from '@/api/hooks/usePipeline.js'
 import { formatDateTime, formatTimeAgo, formatPipelineStatus } from '@/utils/formatters.js'
-import { Loader2, PlayCircle, AlertCircle, CheckCircle2, Clock } from 'lucide-react'
+import { FaSpinner, FaPlay, FaExclamation, FaCheck, FaClock } from 'react-icons/fa6'
 
 export default function PipelineMonitor() {
   const [liveRunId, setLiveRunId] = React.useState(null)
@@ -42,16 +42,26 @@ export default function PipelineMonitor() {
           >
             {triggerMutation.isPending ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <FaSpinner className="w-4 h-4 animate-spin" />
                 Triggering...
               </>
             ) : (
               <>
-                <PlayCircle className="w-4 h-4" />
+                <FaPlay className="w-4 h-4" />
                 Trigger Run
               </>
             )}
           </button>
+        </div>
+
+        {/* Info Banner */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h3 className="font-semibold text-blue-900 mb-2">Job Quality Validation</h3>
+          <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+            <li><strong>Filtered:</strong> Jobs rejected due to: being non-real listings (e.g., "system design"), missing required fields, insufficient description length, invalid title format, or duplicate detection</li>
+            <li><strong>Inserted:</strong> Only verified real job postings from legitimate companies</li>
+            <li>Each job is validated for: authentic job role keywords, minimum description quality, reasonable title length, and semantic uniqueness</li>
+          </ul>
         </div>
 
         {/* Runs Table */}
@@ -64,7 +74,8 @@ export default function PipelineMonitor() {
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">Started</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">Finished</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
-                  <th className="text-right py-3 px-4 font-semibold text-gray-700">Jobs Fetched</th>
+                  <th className="text-right py-3 px-4 font-semibold text-gray-700">Fetched</th>
+                  <th className="text-right py-3 px-4 font-semibold text-gray-700">Filtered</th>
                   <th className="text-right py-3 px-4 font-semibold text-gray-700">Inserted</th>
                 </tr>
               </thead>
@@ -72,7 +83,7 @@ export default function PipelineMonitor() {
                 {runsLoading ? (
                   <tr>
                     <td colSpan={6} className="py-12 text-center text-gray-500">
-                      <Loader2 className="w-6 h-6 animate-spin inline mr-2" />
+                      <FaSpinner className="w-6 h-6 animate-spin inline mr-2" />
                       Loading runs...
                     </td>
                   </tr>
@@ -110,6 +121,9 @@ export default function PipelineMonitor() {
                         </td>
                         <td className="py-4 px-4 text-right text-gray-900 font-medium">
                           {run.jobs_fetched || 0}
+                        </td>
+                        <td className="py-4 px-4 text-right text-orange-600 font-medium" title="Jobs filtered out (non-real jobs, invalid format, etc.)">
+                          {run.jobs_skipped || 0}
                         </td>
                         <td className="py-4 px-4 text-right text-gray-900 font-medium">
                           {run.jobs_inserted || 0}
@@ -161,7 +175,7 @@ function LiveStatusPanel({ runId, onClose, onFinished }) {
     }
   }, [statusData])
 
-  const status = statusData || { status: 'LOADING', jobs_fetched: 0, jobs_inserted: 0 }
+  const status = statusData || { status: 'LOADING', jobs_fetched: 0, jobs_skipped: 0, jobs_inserted: 0 }
   const statusInfo = formatPipelineStatus(status.status)
   const isRunning = status.status === 'RUNNING'
 
@@ -195,6 +209,10 @@ function LiveStatusPanel({ runId, onClose, onFinished }) {
             <div>
               <p className="text-sm text-gray-600">Jobs Fetched</p>
               <p className="text-lg font-semibold text-gray-900">{status.jobs_fetched}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Jobs Skipped</p>
+              <p className="text-lg font-semibold text-orange-600">{status.jobs_skipped || 0}</p>
             </div>
             <div>
               <p className="text-sm text-gray-600">Jobs Inserted</p>

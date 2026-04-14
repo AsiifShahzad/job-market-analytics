@@ -13,7 +13,7 @@ import {
 import { useSalaries, useSkillPremium } from '@/api/hooks/useSalaries.js'
 import { useFilterStore } from '@/stores/filterStore.js'
 import { formatCurrency, formatPercent, formatGrowth } from '@/utils/formatters.js'
-import { Loader2, TrendingUp, TrendingDown } from 'lucide-react'
+import { FaSpinner, FaArrowUp, FaArrowDown } from 'react-icons/fa6'
 
 export default function SalaryInsights() {
   const [selectedTitle, setSelectedTitle] = React.useState('')
@@ -66,7 +66,7 @@ export default function SalaryInsights() {
           <h2 className="text-lg font-semibold mb-4 text-gray-900">Salary Distribution</h2>
           {salariesLoading ? (
             <div className="h-80 flex items-center justify-center">
-              <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+              <FaSpinner className="w-6 h-6 animate-spin text-gray-400" />
             </div>
           ) : salaryRecords.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
@@ -96,7 +96,7 @@ export default function SalaryInsights() {
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-semibold mb-4 text-green-900">High Premium Skills</h3>
             {premiumLoading ? (
-              <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+              <FaSpinner className="w-6 h-6 animate-spin text-gray-400" />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -116,7 +116,7 @@ export default function SalaryInsights() {
                           <td className="py-2 font-medium text-gray-900">{premium.skill}</td>
                           <td className="py-2 text-right">
                             <div className="flex items-center justify-end gap-1">
-                              <TrendingUp className="w-4 h-4 text-green-600" />
+                              <FaArrowUp className="w-4 h-4 text-green-600" />
                               <span className="text-green-600 font-semibold">
                                 +{formatGrowth(premium.delta_pct / 100)}
                               </span>
@@ -134,7 +134,7 @@ export default function SalaryInsights() {
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-semibold mb-4 text-red-900">Lower Premium Skills</h3>
             {premiumLoading ? (
-              <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+              <FaSpinner className="w-6 h-6 animate-spin text-gray-400" />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -154,7 +154,7 @@ export default function SalaryInsights() {
                           <td className="py-2 font-medium text-gray-900">{premium.skill}</td>
                           <td className="py-2 text-right">
                             <div className="flex items-center justify-end gap-1">
-                              <TrendingDown className="w-4 h-4 text-red-600" />
+                              <FaArrowDown className="w-4 h-4 text-red-600" />
                               <span className="text-red-600 font-semibold">
                                 {formatGrowth(premium.delta_pct / 100)}
                               </span>
@@ -174,7 +174,7 @@ export default function SalaryInsights() {
           <h2 className="text-lg font-semibold mb-4 text-gray-900">Complete Skill Premium Analysis</h2>
           {premiumLoading ? (
             <div className="flex justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+              <FaSpinner className="w-6 h-6 animate-spin text-gray-400" />
             </div>
           ) : (
             <div className="overflow-x-auto">

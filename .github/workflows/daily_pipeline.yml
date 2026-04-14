@@ -1,0 +1,102 @@
+# .github/workflows/pipeline.yml
+#
+# FIX: You had TWO workflow files both triggering the pipeline:
+#   1. One running `python run_pipeline_direct()` directly (every 24h at 06:00)
+#   2. One calling POST /api/pipeline/run via curl (every 6h)
+#
+# This caused:
+#   - Race conditions: both workflows hitting the DB simultaneously
+#   - Double cold-starts: waking Neon twice, causing the second to fail
+#   - Confusing run history in the DB (duplicate PipelineRun rows)
+#
+# This single workflow replaces both. It:
+#   1. Warms up the Render service BEFORE running the pipeline (solves cold-start 500s)
+#   2. Calls the HTTP endpoint (simpler, no need to install Python deps in CI)
+#   3. Runs once daily at 06:00 UTC (adjust to your preference)
+
+name: Daily Job Ingestion Pipeline
+
+on:
+  schedule:
+    - cron: "0 6 * * *"       # 06:00 UTC every day
+  workflow_dispatch:            # manual trigger from GitHub UI
+    inputs:
+      pages:
+        description: "Number of Adzuna pages to fetch (1-10)"
+        required: false
+        default: "3"
+
+jobs:
+  run-pipeline:
+    name: Fetch & ingest jobs
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Warm up Render service
+        # Render free tier sleeps after 15min of inactivity.
+        # Hit /api/health first (fast, no DB) to wake the dyno,
+        # then wait for it to be ready before hitting the pipeline endpoint.
+        # Without this, POST /api/pipeline/run is the cold-start request
+        # and it times out or 500s while the service is still booting.
+        run: |
+          echo "⏳ Waking up Render service..."
+          for i in {1..12}; do
+            status=$(curl -s -o /dev/null -w "%{http_code}" \
+              --max-time 10 \
+              "https://job-market-analytics-p4sy.onrender.com/api/health")
+            echo "  Attempt $i: HTTP $status"
+            if [ "$status" = "200" ]; then
+              echo "✅ Service is awake"
+              break
+            fi
+            sleep 10
+          done
+
+      - name: Warm up Neon database
+        # Hit /api/health/db to wake the Neon serverless branch.
+        # Neon free tier also cold-starts — this gives it up to 60s to wake
+        # before the pipeline tries to do real DB writes.
+        run: |
+          echo "⏳ Waking up Neon database..."
+          for i in {1..6}; do
+            response=$(curl -s --max-time 15 \
+              "https://job-market-analytics-p4sy.onrender.com/api/health/db")
+            echo "  Attempt $i: $response"
+            db_status=$(echo "$response" | grep -o '"database":"[^"]*"' | cut -d'"' -f4)
+            if [ "$db_status" = "connected" ]; then
+              echo "✅ Database is connected"
+              break
+            fi
+            sleep 10
+          done
+
+      - name: Run ETL pipeline
+        run: |
+          PAGES="${{ github.event.inputs.pages || '3' }}"
+          echo "🚀 Running pipeline with $PAGES pages..."
+
+          response=$(curl -s -X POST \
+            --max-time 300 \
+            "https://job-market-analytics-p4sy.onrender.com/api/pipeline/run?pages=$PAGES" \
+            -H "Content-Type: application/json" \
+            -w "\n%{http_code}")
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+
+          echo "Status Code: $http_code"
+          echo "Response: $body"
+
+          if [ "$http_code" -eq 200 ] || [ "$http_code" -eq 201 ]; then
+            echo "✅ Pipeline completed successfully!"
+            jobs_inserted=$(echo "$body" | grep -o '"jobs_inserted":[0-9]*' | grep -o '[0-9]*' || echo "unknown")
+            echo "📊 Jobs inserted: $jobs_inserted"
+          else
+            echo "❌ Pipeline failed with HTTP $http_code"
+            exit 1
+          fi
+
+      - name: Notify on failure
+        if: failure()
+        run: echo "::error::Pipeline failed — check the logs above for the full response body"

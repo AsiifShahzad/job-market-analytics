@@ -68,6 +68,18 @@ export const api = {
   },
 
   /**
+   * Insights endpoints
+   */
+  insights: {
+    summary: async () => api.get('/insights/summary'),
+    skills: async () => api.get('/insights/skills'),
+    salary: async () => api.get('/insights/salary'),
+    market: async () => api.get('/insights/market'),
+    keywords: async () => api.get('/insights/keywords'),
+    seniority: async () => api.get('/insights/seniority'),
+  },
+
+  /**
    * Pipeline endpoints
    */
   pipeline: {

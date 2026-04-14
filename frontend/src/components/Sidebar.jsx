@@ -1,6 +1,6 @@
 import React from 'react'
 import { useFilterStore } from '@/stores/filterStore.js'
-import { X } from 'lucide-react'
+import { FaXmark } from 'react-icons/fa6'
 
 export function Sidebar({ onClose }) {
   const {
@@ -50,7 +50,7 @@ export function Sidebar({ onClose }) {
             onClick={onClose}
             className="md:hidden text-gray-500 hover:text-gray-700"
           >
-            <X className="w-6 h-6" />
+            <FaXmark className="w-6 h-6" />
           </button>
         )}
       </div>

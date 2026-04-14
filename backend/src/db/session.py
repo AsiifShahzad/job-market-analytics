@@ -1,75 +1,81 @@
 """
-Async database session configuration using SQLAlchemy with asyncpg
-Manages connection pool and provides FastAPI dependency for DB access
+Async SQLAlchemy session management.
+Cloud-only: connects exclusively to Neon (PostgreSQL).
+Crashes on startup if DATABASE_URL is not set — no silent localhost fallback.
 """
 
 import os
+import asyncio
 from typing import AsyncGenerator
 from contextlib import asynccontextmanager
+
+from dotenv import load_dotenv
+load_dotenv()  # load .env before reading DATABASE_URL
 
 from sqlalchemy.ext.asyncio import (
     AsyncSession, create_async_engine, async_sessionmaker, AsyncEngine
 )
-from sqlalchemy.pool import NullPool, QueuePool
+from sqlalchemy.pool import NullPool
 import structlog
 
 from .models import Base
 
 logger = structlog.get_logger(__name__)
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+asyncpg://user:pass@localhost/jobpulse"
-)
+# ── Database URL — Neon only, no localhost fallback ───────────────────────────
 
-# Validate Neon URL format if applicable
-if "neon.tech" in DATABASE_URL or "asyncpg" in DATABASE_URL:
-    logger.info("Using async PostgreSQL with asyncpg driver", url=DATABASE_URL[:50] + "...")
-elif "sqlite" in DATABASE_URL:
-    logger.info("Using SQLite for development", url=DATABASE_URL)
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL environment variable is not set. "
+        "Add it to your .env file (locally) or Render environment variables (production). "
+        "It should be your Neon connection string."
+    )
 
-def create_engine() -> AsyncEngine:
-    """
-    Create async engine with database-specific configuration.
-    - PostgreSQL (Neon): Connection pooling with 5 connections
-    - SQLite: Local file database for development
-    """
-    is_sqlite = "sqlite" in DATABASE_URL
-    
-    if is_sqlite:
-        # SQLite doesn't use pool_size, max_overflow, or server_settings
-        engine = create_async_engine(
-            DATABASE_URL,
-            echo=os.getenv("SQL_ECHO", "false").lower() == "true",
-            future=True,
-            poolclass=NullPool,  # SQLite works better with NullPool
-            connect_args={"timeout": 5}
-        )
-    else:
-        # PostgreSQL configuration
-        engine = create_async_engine(
-            DATABASE_URL,
-            echo=os.getenv("SQL_ECHO", "false").lower() == "true",
-            future=True,
-            pool_pre_ping=True,
-            pool_size=5,
-            max_overflow=10,
-            connect_args={
-                "server_settings": {
-                    "application_name": "jobpulse-ai",
-                    "jit": "off",  # Disable JIT for Neon
-                },
-                "timeout": 15,  # 15 second connection timeout for Neon cold-start
-                "command_timeout": 30,  # 30 second command timeout
-            }
-        )
-    return engine
+# Normalize postgres:// / postgresql:// → postgresql+asyncpg://
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+elif DATABASE_URL.startswith("postgresql://") and "asyncpg" not in DATABASE_URL:
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+# Reject any accidental localhost / SQLite URL
+_lower = DATABASE_URL.lower()
+if "localhost" in _lower or "127.0.0.1" in _lower or "sqlite" in _lower:
+    raise RuntimeError(
+        f"DATABASE_URL points to a local database — this app only supports Neon (cloud Postgres). "
+        f"Check your .env file. URL starts with: {DATABASE_URL[:60]}"
+    )
+
+logger.info("Using Neon database", url_prefix=DATABASE_URL[:40] + "...")
 
 
-async_engine = create_engine()
+# ── Engine — NullPool for Neon serverless ─────────────────────────────────────
+# NullPool opens a fresh connection per request instead of keeping a pool.
+# Neon serverless drops idle connections after ~5 min; a standard pool
+# thinks those connections are alive and gets "SSL connection closed" errors.
+# NullPool avoids this entirely.
 
-# Session factory for dependency injection
+def _build_engine() -> AsyncEngine:
+    return create_async_engine(
+        DATABASE_URL,
+        echo=os.getenv("SQL_ECHO", "false").lower() == "true",
+        future=True,
+        poolclass=NullPool,
+        connect_args={
+            "server_settings": {
+                "application_name": "jobpulse-ai",
+                "jit": "off",
+            },
+            "timeout": 60,        # Neon free tier can take 20-30s to cold-start
+            "command_timeout": 30,
+            "ssl": "require",     # Neon requires SSL — explicit is safer than implicit
+        },
+    )
+
+
+async_engine = _build_engine()
+
 async_session_maker = async_sessionmaker(
     async_engine,
     class_=AsyncSession,
@@ -79,99 +85,76 @@ async_session_maker = async_sessionmaker(
 )
 
 
+# ── Session dependency ────────────────────────────────────────────────────────
+
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
-    FastAPI dependency: provides an AsyncSession for route handlers.
-    Automatically commits on success, rolls back on exception.
-    Has timeout protection to prevent hanging.
-    Handles Neon cold-start issues with better error messages.
+    FastAPI dependency — yields a DB session.
+    Retries once on connection error to handle Neon cold-starts gracefully.
     """
-    import asyncio
-    try:
-        # Create session with timeout
-        async with async_session_maker() as session:
-            try:
-                # Test connection before yielding
-                await session.execute(__import__('sqlalchemy').text("SELECT 1"))
-                yield session
-                await session.commit()
-            except Exception as e:
-                await session.rollback()
-                error_str = str(e).lower()
-                
-                # Provide helpful error messages for common issues
-                if 'timeout' in error_str or 'connection refused' in error_str or 'network' in error_str:
-                    logger.error(
-                        "Database connection timeout or network error - Neon may be cold-starting",
-                        error=str(e),
-                        exc_info=True
-                    )
-                elif 'neon' in error_str or 'branch' in error_str:
-                    logger.error("Neon-specific database error", error=str(e), exc_info=True)
-                else:
-                    logger.error("Database session error", error=str(e), exc_info=True)
-                
-                raise
-            finally:
-                await session.close()
-    except asyncio.TimeoutError:
-        logger.error("Database session acquisition timed out")
-        raise
-    except Exception as e:
-        logger.error("Failed to acquire database session", error=str(e))
-        raise
+    last_exc = None
 
+    for attempt in range(2):
+        try:
+            async with async_session_maker() as session:
+                try:
+                    yield session
+                    await session.commit()
+                    return
+                except Exception:
+                    await session.rollback()
+                    raise
+                finally:
+                    await session.close()
+
+        except Exception as exc:
+            last_exc = exc
+            is_connection_error = any(
+                phrase in str(exc).lower()
+                for phrase in [
+                    "connection", "timeout", "ssl",
+                    "could not connect", "server closed the connection",
+                ]
+            )
+            if attempt == 0 and is_connection_error:
+                logger.warning(
+                    "Neon connection failed, retrying in 3s",
+                    attempt=attempt,
+                    error=str(exc)[:200],
+                )
+                await asyncio.sleep(3)
+                continue
+            raise
+
+    raise last_exc
+
+
+# ── Lifespan ──────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
-async def lifespan_context():
-    """
-    Application lifespan manager: performs health check on startup.
-    Creates tables as needed (with longer timeout for Neon cold-start).
-    """
-    db_connected = False
-    
-    # Startup: Try to connect to database and create tables
+async def lifespan_db():
+    """Creates tables on startup, disposes engine on shutdown."""
     try:
-        logger.info("Starting database connection...")
-        import asyncio
-        from sqlalchemy import text
-        
-        # Simple connection test with longer timeout for Neon cold-start
-        async with async_session_maker() as session:
+        async with async_engine.begin() as conn:
             await asyncio.wait_for(
-                session.execute(text("SELECT 1")),
-                timeout=15.0  # Increased from 5 to 15 seconds for Neon
+                conn.run_sync(Base.metadata.create_all),
+                timeout=60.0,
             )
-        
-        db_connected = True
-        logger.info("Database connected successfully")
-        
-        # Now try to create tables with timeout
-        try:
-            logger.info("Creating database tables if not exists...")
-            async with async_engine.begin() as conn:
-                await asyncio.wait_for(
-                    conn.run_sync(Base.metadata.create_all),
-                    timeout=30.0  # Increased from 10 to 30 seconds
-                )
-            logger.info("Database tables ready")
-        except asyncio.TimeoutError:
-            logger.warning("Database table creation timed out, but connection is working")
-        except Exception as e:
-            logger.warning(f"Failed to create database tables: {e}")
-            
+        logger.info("Neon database tables ready")
+
     except asyncio.TimeoutError:
-        logger.warning("Database connection test timed out after 15 seconds, proceeding without DB")
+        logger.error("Neon DB table creation timed out after 60s")
     except Exception as e:
-        logger.warning(f"Database connection failed: {e}, proceeding without DB")
+        logger.error(
+            "Neon DB init failed",
+            error=str(e),
+            error_type=type(e).__name__,
+        )
 
     yield
 
-    # Shutdown: Dispose of connection pool
     try:
-        if db_connected:
-            logger.info("Closing database connections...")
-            await async_engine.dispose()
-            logger.info("Database connections closed")
+        await async_engine.dispose()
+        logger.info("Neon database connections closed")
     except Exception as e:
-        logger.warning(f"Error closing database: {e}")
+        logger.warning("Error closing Neon connections", error=str(e))

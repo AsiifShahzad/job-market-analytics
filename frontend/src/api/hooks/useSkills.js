@@ -10,22 +10,10 @@ export function useSkills(params) {
   return useQuery({
     queryKey: ['skills', params],
     queryFn: async () => {
-      try {
-        const response = await api.skills.list(params)
-        // Handle different API response structures
-        const skillsData =
-          response?.data?.skills ||
-          response?.skills ||
-          response?.data ||
-          []
-        return {
-          skills: Array.isArray(skillsData) ? skillsData : [],
-          data: { skills: Array.isArray(skillsData) ? skillsData : [] },
-        }
-      } catch (error) {
-        console.error('Error fetching skills:', error)
-        return { skills: [], data: { skills: [] } }
-      }
+      const response = await api.skills.list(params)
+      // API returns { skills: [...], total_count, ... }
+      const skills = Array.isArray(response?.skills) ? response.skills : []
+      return { skills }
     },
     staleTime: STALE_TIME,
     keepPreviousData: true,
@@ -57,16 +45,15 @@ export function useSkillCooccurrence(skillName) {
   })
 }
 
-/**
- * Hook for fetching all unique skills for filtering
- */
 export function useAllSkills() {
   return useQuery({
     queryKey: ['all-skills'],
     queryFn: async () => {
       const response = await api.skills.list({ limit: 500 })
-      return response.skills
+      const skills = Array.isArray(response?.skills) ? response.skills : []
+      return { skills }
     },
     staleTime: STALE_TIME,
+    retry: 2,
   })
 }

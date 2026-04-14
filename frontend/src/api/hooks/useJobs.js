@@ -7,9 +7,13 @@ const STALE_TIME = 5 * 60 * 1000 // 5 minutes
  * Hook for fetching jobs with filters
  */
 export function useJobs(filters) {
+  const apiFilters = { ...filters }
+  if (Array.isArray(apiFilters.skills)) {
+    apiFilters.skills = apiFilters.skills.join(',')
+  }
   return useQuery({
     queryKey: ['jobs', filters],
-    queryFn: () => api.jobs.search(filters),
+    queryFn: () => api.jobs.search(apiFilters),
     staleTime: STALE_TIME,
     keepPreviousData: true,
     enabled: !!filters,

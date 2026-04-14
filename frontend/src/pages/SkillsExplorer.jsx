@@ -16,7 +16,7 @@ import { useFilterStore } from '@/stores/filterStore.js'
 import { Sidebar } from '@/components/Sidebar.jsx'
 import { categoryColors, getCategoryBgColor, getCategoryTextColor } from '@/utils/chartColors.js'
 import { formatCurrency, formatTfIdfScore } from '@/utils/formatters.js'
-import { Loader2, X, ChevronDown } from 'lucide-react'
+import { FaSpinner, FaXmark, FaChevronDown } from 'react-icons/fa6'
 
 export default function SkillsExplorer() {
   const [selectedSkill, setSelectedSkill] = React.useState(null)
@@ -57,7 +57,7 @@ export default function SkillsExplorer() {
               onClick={() => setMobileFilterOpen(true)}
               className="md:hidden flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
             >
-              <ChevronDown className="w-4 h-4" />
+              <FaChevronDown className="w-4 h-4" />
               Filters
             </button>
           </div>
@@ -65,7 +65,7 @@ export default function SkillsExplorer() {
           {/* Skills Grid */}
           {isLoading ? (
             <div className="flex justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+              <FaSpinner className="w-8 h-8 animate-spin text-gray-400" />
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -152,7 +152,7 @@ function SkillDetailDrawer({ skillName, onClose }) {
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded"
           >
-            <X className="w-5 h-5" />
+            <FaXmark className="w-5 h-5" />
           </button>
         </div>
 
@@ -162,7 +162,7 @@ function SkillDetailDrawer({ skillName, onClose }) {
             <h3 className="font-semibold mb-3 text-gray-900">Trend Over Time</h3>
             {trendLoading ? (
               <div className="h-64 flex items-center justify-center">
-                <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                <FaSpinner className="w-6 h-6 animate-spin text-gray-400" />
               </div>
             ) : trendData?.trends && trendData.trends.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
@@ -186,7 +186,7 @@ function SkillDetailDrawer({ skillName, onClose }) {
           <div>
             <h3 className="font-semibold mb-3 text-gray-900">Often Paired With</h3>
             {cooccurLoading ? (
-              <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+              <FaSpinner className="w-6 h-6 animate-spin text-gray-400" />
             ) : cooccurData?.cooccurring && cooccurData.cooccurring.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {cooccurData.cooccurring.slice(0, 5).map((item, idx) => (

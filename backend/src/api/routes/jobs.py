@@ -1,213 +1,159 @@
 """
-Jobs endpoints - fetch real job data from database
+GET /api/jobs/search
+Paginated job search with filters.
+Returns all fields the frontend job cards need.
 """
 
-import structlog
-from fastapi import APIRouter, Query, Depends
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, or_, and_
 from typing import Optional, List
+import structlog
 
 from src.db.session import get_db
-from src.db.models import Job, JobSkill, Skill
+from src.db.models import Job, Skill, JobSkill
+from src.api.schemas import JobsSearchResponse, JobItem, PaginationMeta
 
 logger = structlog.get_logger(__name__)
-router = APIRouter(prefix="/api/jobs", tags=["jobs"])
+router = APIRouter(tags=["jobs"])
 
 
-@router.get("/search", response_model=dict)
+@router.get("/api/jobs/search", response_model=JobsSearchResponse)
 async def search_jobs(
-    keyword: str = Query("", description="Search keyword in title/description"),
-    location: Optional[str] = Query(None, description="Filter by city or country"),
-    salary_min: Optional[float] = Query(None, description="Minimum salary filter"),
-    salary_max: Optional[float] = Query(None, description="Maximum salary filter"),
-    salary_currency: str = Query("USD", description="Salary currency"),
-    skill: Optional[List[str]] = Query(None, description="Filter by skills"),
-    sort_by: str = Query("relevance", description="Sort by: relevance, salary, date"),
-    sort_order: str = Query("desc", description="Sort order: asc or desc"),
-    page: int = Query(1, ge=1, description="Page number"),
-    limit: int = Query(20, ge=1, le=100, description="Results per page"),
     db: AsyncSession = Depends(get_db),
-):
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    search: Optional[str] = Query(None, description="Keyword in title or description"),
+    city: Optional[str] = Query(None),
+    country: Optional[str] = Query(None),
+    seniority: Optional[str] = Query(None, description="junior | mid | senior | lead | unspecified"),
+    min_salary: Optional[float] = Query(None),
+    max_salary: Optional[float] = Query(None),
+    remote: Optional[bool] = Query(None),
+    skills: Optional[str] = Query(None, description="Comma separated list of skills"),
+    skill_match_type: str = Query("any", description="any | all"),
+    sort_by: str = Query("date", description="date | salary_min | salary_max | salary_mid"),
+) -> JobsSearchResponse:
     """
-    Search jobs from database with optional filters.
-    Returns paginated results with skill associations.
+    Search jobs with optional filters and pagination.
+    Returns job cards with extracted skills list attached.
     """
     try:
-        # Build query
+        filters = []
+
+        if search:
+            term = f"%{search}%"
+            filters.append(
+                or_(Job.title.ilike(term), Job.description.ilike(term), Job.company.ilike(term))
+            )
+        if city:
+            filters.append(Job.city.ilike(f"%{city}%"))
+        if country:
+            filters.append(Job.country.ilike(f"%{country}%"))
+        if seniority:
+            filters.append(Job.seniority == seniority)
+        if min_salary is not None:
+            filters.append(Job.salary_mid >= min_salary)
+        if max_salary is not None:
+            filters.append(Job.salary_mid <= max_salary)
+        if remote is not None:
+            filters.append(Job.remote == remote)
+            
+        if skills:
+            parsed_skills = [s.strip().lower() for s in skills.split(",")]
+            if parsed_skills:
+                if skill_match_type == "all":
+                    for skill_name in parsed_skills:
+                        skill_subq = (
+                            select(JobSkill.job_id)
+                            .join(Skill, JobSkill.skill_id == Skill.id)
+                            .where(func.lower(Skill.name) == skill_name)
+                            .scalar_subquery()
+                        )
+                        filters.append(Job.id.in_(skill_subq))
+                else:
+                    skill_subq = (
+                        select(JobSkill.job_id)
+                        .join(Skill, JobSkill.skill_id == Skill.id)
+                        .where(func.lower(Skill.name).in_(parsed_skills))
+                        .scalar_subquery()
+                    )
+                    filters.append(Job.id.in_(skill_subq))
+
+        # Count total matching rows
+        count_q = select(func.count(Job.id))
+        if filters:
+            count_q = count_q.where(and_(*filters))
+        total = (await db.execute(count_q)).scalar() or 0
+
+        # Build main query
         query = select(Job)
-        
-        # Apply keyword search
-        if keyword:
-            search_term = f"%{keyword}%"
-            from sqlalchemy import or_
-            query = query.where(
-                or_(
-                    Job.title.ilike(search_term),
-                    Job.description.ilike(search_term),
-                    Job.company.ilike(search_term)
-                )
-            )
-        
-        # Apply location filter (search in city or location_raw)
-        if location:
-            from sqlalchemy import or_
-            location_term = f"%{location}%"
-            query = query.where(
-                or_(
-                    Job.city.ilike(location_term),
-                    Job.location_raw.ilike(location_term),
-                    Job.country.ilike(location_term)
-                )
-            )
-        
-        # Apply salary filters
-        if salary_min is not None:
-            query = query.where(Job.salary_max >= salary_min)
-        if salary_max is not None:
-            query = query.where(Job.salary_min <= salary_max)
-        
-        # Apply skill filter if provided
-        if skill:
-            skill_names = [s.lower() for s in skill]
-            # Join with job_skill and skill tables
-            query = query.join(JobSkill).join(Skill).where(
-                Skill.name.in_(skill_names)
-            ).distinct()
-        
-        # Count total before limiting
-        count_query = select(func.count()).select_from(Job)
-        
-        # Apply same filters to count query
-        if keyword:
-            search_term = f"%{keyword}%"
-            from sqlalchemy import or_
-            count_query = count_query.where(
-                or_(
-                    Job.title.ilike(search_term),
-                    Job.description.ilike(search_term),
-                    Job.company.ilike(search_term)
-                )
-            )
-        if location:
-            from sqlalchemy import or_
-            location_term = f"%{location}%"
-            count_query = count_query.where(
-                or_(
-                    Job.city.ilike(location_term),
-                    Job.location_raw.ilike(location_term),
-                    Job.country.ilike(location_term)
-                )
-            )
-        if salary_min is not None:
-            count_query = count_query.where(Job.salary_max >= salary_min)
-        if salary_max is not None:
-            count_query = count_query.where(Job.salary_min <= salary_max)
-        
-        total_result = await db.execute(count_query)
-        total = total_result.scalar_one()
-        
-        # Apply sorting
-        if sort_by == "salary":
-            query = query.order_by(
-                desc(Job.salary_max) if sort_order == "desc" else Job.salary_max
-            )
-        elif sort_by == "date":
-            query = query.order_by(
-                desc(Job.created_at) if sort_order == "desc" else Job.created_at
-            )
-        else:  # relevance (default)
-            query = query.order_by(desc(Job.id))
-        
-        # Apply pagination
+        if filters:
+            query = query.where(and_(*filters))
+
+        # Sort
+        sort_col = {
+            "salary_min": Job.salary_min,
+            "salary_max": Job.salary_max,
+            "salary_mid": Job.salary_mid,
+        }.get(sort_by, Job.posted_at)
+
+        query = query.order_by(desc(sort_col).nullslast())
+
+        # Paginate
         offset = (page - 1) * limit
         query = query.offset(offset).limit(limit)
-        
-        # Execute query
-        result = await db.execute(query)
-        jobs = result.scalars().all()
-        
-        # Format response
-        jobs_data = []
-        for job in jobs:
-            desc_short = job.description[:200] + "..." if job.description and len(job.description) > 200 else job.description
-            location_display = f"{job.city}, {job.country}" if job.city else job.location_raw
-            job_dict = {
-                "id": job.id,
-                "title": job.title,
-                "company": job.company,
-                "location": location_display,
-                "description": desc_short,
-                "salary_min": job.salary_min,
-                "salary_max": job.salary_max,
-                "salary_mid": job.salary_mid,
-                "salary_currency": salary_currency,
-                "created": job.created_at.isoformat() if job.created_at else None,
-            }
-            jobs_data.append(job_dict)
-        
-        logger.info(
-            "Job search executed",
-            keyword=keyword,
-            total_results=total,
-            returned=len(jobs_data),
-            page=page
-        )
-        
-        return {
-            "data": jobs_data,
-            "pagination": {
-                "page": page,
-                "limit": limit,
-                "total": total,
-                "pages": (total + limit - 1) // limit,
-            }
-        }
-    
-    except Exception as e:
-        logger.error("Job search failed", error=str(e))
-        raise
 
+        jobs = (await db.execute(query)).scalars().all()
 
-@router.get("/{job_id}", response_model=dict)
-async def get_job_detail(
-    job_id: str,
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Get detailed information about a specific job including skills.
-    """
-    try:
-        # Fetch job
-        result = await db.execute(select(Job).where(Job.id == job_id))
-        job = result.scalar_one_or_none()
-        
-        if not job:
-            return {"error": "Job not found"}, 404
-        
-        # Fetch associated skills
-        skills_result = await db.execute(
-            select(Skill).join(JobSkill).where(JobSkill.job_id == job_id)
+        # Fetch skills for each job in one query
+        job_ids = [j.id for j in jobs]
+        skills_q = (
+            select(JobSkill.job_id, Skill.name)
+            .join(Skill, JobSkill.skill_id == Skill.id)
+            .where(JobSkill.job_id.in_(job_ids))
         )
-        skills = skills_result.scalars().all()
-        
-        location_display = f"{job.city}, {job.country}" if job.city else job.location_raw
-        
-        return {
-            "data": {
-                "id": job.id,
-                "title": job.title,
-                "company": job.company,
-                "location": location_display,
-                "description": job.description,
-                "salary_min": job.salary_min,
-                "salary_max": job.salary_max,
-                "salary_mid": job.salary_mid,
-                "created": job.created_at.isoformat() if job.created_at else None,
-                "skills": [{"name": s.name, "category": s.category} for s in skills],
-            }
-        }
-    
+        skill_rows = (await db.execute(skills_q)).fetchall()
+
+        # Build job_id → [skill_name] map
+        skills_map: dict[str, list[str]] = {}
+        for job_id, skill_name in skill_rows:
+            skills_map.setdefault(job_id, []).append(skill_name)
+
+        # Format location for display
+        def fmt_location(job: Job) -> str:
+            if job.city and job.country:
+                return f"{job.city}, {job.country}"
+            return job.location_raw or ""
+
+        items = [
+            JobItem(
+                id=job.id,
+                title=job.title,
+                company=job.company,
+                location=fmt_location(job),
+                description=job.description,
+                salary_min=job.salary_min,
+                salary_max=job.salary_max,
+                salary_mid=job.salary_mid,
+                salary_currency="USD",
+                created=job.posted_at,
+                url=job.url,
+                remote=job.remote,
+                skills=skills_map.get(job.id, []),
+            )
+            for job in jobs
+        ]
+
+        pages = max(1, -(-total // limit))  # ceiling division
+
+        logger.info("jobs search", total=total, page=page, returned=len(items))
+
+        return JobsSearchResponse(
+            data=items,
+            pagination=PaginationMeta(page=page, limit=limit, total=total, pages=pages),
+        )
+
     except Exception as e:
-        logger.error("Failed to fetch job detail", job_id=job_id, error=str(e))
-        raise
+        logger.error("jobs search error", error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to search jobs")
