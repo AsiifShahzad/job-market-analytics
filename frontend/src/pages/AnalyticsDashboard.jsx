@@ -8,20 +8,24 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, L
  * Memoized Bar Chart Component
  * Prevents re-creation on every parent render
  */
-const MemoizedBarChart = memo(({ data, title, dataKey, fill, height = 450 }) => (
-  <div className="bg-slate-800 rounded-lg p-6">
-    <h3 className="text-lg font-semibold text-white mb-4">{title}</h3>
-    <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: 100 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
-        <XAxis dataKey="skill" tick={{ fill: '#cbd5e1', fontSize: 12 }} angle={-45} textAnchor="end" height={80} />
-        <YAxis tick={{ fill: '#cbd5e1' }} />
-        <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }} labelStyle={{ color: '#cbd5e1' }} />
-        <Bar dataKey={dataKey} fill={fill} />
-      </BarChart>
-    </ResponsiveContainer>
-  </div>
-));
+const MemoizedBarChart = memo(({ data, title, dataKey, fill, height = 350 }) => {
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const chartHeight = isMobile ? 250 : height;
+  return (
+    <div className="bg-slate-800 rounded-lg p-3 sm:p-6">
+      <h3 className="text-base sm:text-lg font-semibold text-white mb-3 sm:mb-4">{title}</h3>
+      <ResponsiveContainer width="100%" height={chartHeight}>
+        <BarChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: 100 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
+          <XAxis dataKey="skill" tick={{ fill: '#cbd5e1', fontSize: 12 }} angle={-45} textAnchor="end" height={80} />
+          <YAxis tick={{ fill: '#cbd5e1' }} />
+          <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }} labelStyle={{ color: '#cbd5e1' }} />
+          <Bar dataKey={dataKey} fill={fill} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+});
 
 MemoizedBarChart.displayName = 'MemoizedBarChart';
 
@@ -29,22 +33,26 @@ MemoizedBarChart.displayName = 'MemoizedBarChart';
  * Memoized Multi-Bar Chart Component
  * For charts with multiple bars (e.g., current vs previous week)
  */
-const MemoizedMultiBarChart = memo(({ data, title, bar1, bar2, fill1, fill2, height = 450 }) => (
-  <div className="bg-slate-800 rounded-lg p-6">
-    <h3 className="text-lg font-semibold text-white mb-4">{title}</h3>
-    <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: 100 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
-        <XAxis dataKey="skill" tick={{ fill: '#cbd5e1', fontSize: 12 }} angle={-45} textAnchor="end" height={80} />
-        <YAxis tick={{ fill: '#cbd5e1' }} />
-        <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }} labelStyle={{ color: '#cbd5e1' }} />
-        <Legend wrapperStyle={{ color: '#cbd5e1' }} />
-        <Bar dataKey={bar1} fill={fill1} name={bar1} />
-        <Bar dataKey={bar2} fill={fill2} name={bar2} />
-      </BarChart>
-    </ResponsiveContainer>
-  </div>
-));
+const MemoizedMultiBarChart = memo(({ data, title, bar1, bar2, fill1, fill2, height = 350 }) => {
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const chartHeight = isMobile ? 250 : height;
+  return (
+    <div className="bg-slate-800 rounded-lg p-3 sm:p-6">
+      <h3 className="text-base sm:text-lg font-semibold text-white mb-3 sm:mb-4">{title}</h3>
+      <ResponsiveContainer width="100%" height={chartHeight}>
+        <BarChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: 100 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
+          <XAxis dataKey="skill" tick={{ fill: '#cbd5e1', fontSize: 12 }} angle={-45} textAnchor="end" height={80} />
+          <YAxis tick={{ fill: '#cbd5e1' }} />
+          <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }} labelStyle={{ color: '#cbd5e1' }} />
+          <Legend wrapperStyle={{ color: '#cbd5e1' }} />
+          <Bar dataKey={bar1} fill={fill1} name={bar1} />
+          <Bar dataKey={bar2} fill={fill2} name={bar2} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+});
 
 MemoizedMultiBarChart.displayName = 'MemoizedMultiBarChart';
 
@@ -52,91 +60,74 @@ MemoizedMultiBarChart.displayName = 'MemoizedMultiBarChart';
  * Memoized Metric Card Component
  */
 const MemoizedMetricCard = memo(({ bg, textColor, label, value }) => (
-  <div className={`${bg} rounded-lg p-6`}>
-    <p className={`${textColor} text-sm`}>{label}</p>
-    <p className="text-3xl font-bold text-white">{value}</p>
+  <div className={`${bg} rounded-lg p-3 sm:p-4 md:p-6`}>
+    <p className={`${textColor} text-xs sm:text-sm`}>{label}</p>
+    <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white mt-1 sm:mt-2">{value}</p>
   </div>
 ));
 
 MemoizedMetricCard.displayName = 'MemoizedMetricCard';
 
 const AnalyticsDashboard = () => {
-  const [analytics, setAnalytics] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('insights');
-
-  useEffect(() => {
-    const fetchAnalytics = async () => {
-      try {
-        const response = await axios.get('/api/analytics/rigorous');
-        setAnalytics(response.data);
-        setLoading(false);
-      } catch (err) {
-        setError('Failed to load analytics');
-        setLoading(false);
-      }
-    };
-    
-    fetchAnalytics();
-  }, []);
 
   // ── MEMOIZED DATA SELECTORS ────────────────────────────────────────────
   // These prevent chart re-creation by memoizing sliced data
   
   const trendingSkillsTop8 = useMemo(
-    () => analytics?.trending_skills?.slice(0, 8) || [],
-    [analytics?.trending_skills]
+    () => [],
+    []
   );
   
   const topPayingSkills = useMemo(
-    () => analytics?.salary_insights?.top_paying_skills || [],
-    [analytics?.salary_insights?.top_paying_skills]
+    () => [],
+    []
   );
-  
+
   const topCities = useMemo(
-    () => analytics?.market_insights?.top_cities || [],
-    [analytics?.market_insights?.top_cities]
+    () => [],
+    []
   );
-  
+
   const topCountries = useMemo(
-    () => analytics?.market_insights?.top_countries || [],
-    [analytics?.market_insights?.top_countries]
+    () => [],
+    []
   );
-  
+
   const skillInsights = useMemo(
-    () => analytics?.skill_insights || {},
-    [analytics?.skill_insights]
+    () => ({}),
+    []
   );
-  
+
   const trendingSkills = useMemo(
-    () => analytics?.trending_skills || [],
-    [analytics?.trending_skills]
+    () => [],
+    []
   );
-  
+
   const salaryInsights = useMemo(
-    () => analytics?.salary_insights || {},
-    [analytics?.salary_insights]
+    () => ({}),
+    []
   );
-  
+
   const marketInsights = useMemo(
-    () => analytics?.market_insights || {},
-    [analytics?.market_insights]
+    () => ({}),
+    []
   );
   
   const actionableInsights = useMemo(
-    () => analytics?.actionable_insights || [],
-    [analytics?.actionable_insights]
+    () => [],
+    []
   );
   
   const dataQualityReport = useMemo(
-    () => analytics?.data_quality_report || {},
-    [analytics?.data_quality_report]
+    () => ({}),
+    []
   );
 
   if (loading) return <div className="p-8 text-center">Loading analytics...</div>;
   if (error) return <div className="p-8 text-center text-red-600">{error}</div>;
-  if (!analytics) return <div className="p-8 text-center">No data available</div>;
 
   return (
     <div className="min-h-screen bg-slate-900">
@@ -171,10 +162,10 @@ const AnalyticsDashboard = () => {
             {analytics.actionable_insights && analytics.actionable_insights.length > 0 ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {analytics.actionable_insights.map((insight, idx) => (
-                  <div key={idx} className="bg-slate-800 border border-slate-700 rounded-lg p-6">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <p className="text-white text-lg">{insight.text}</p>
+                  <div key={idx} className="bg-slate-800 border border-slate-700 rounded-lg p-3 sm:p-4 md:p-6\">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-0 mb-2 sm:mb-3\">
+                      <div className="flex-1\">
+                        <p className="text-white text-sm sm:text-base md:text-lg\">{insight.text}</p>
                       </div>
                       <span className={`ml-4 px-3 py-1 rounded text-sm font-bold whitespace-nowrap ${
                         insight.confidence === 'HIGH' ? 'bg-green-900 text-green-300' :
@@ -197,7 +188,7 @@ const AnalyticsDashboard = () => {
 
         {/* SKILL DEMAND */}
         {activeTab === 'skills' && (
-          <div className="space-y-8">
+          <div className="space-y-6 sm:space-y-8">
             <h2 className="text-2xl font-bold text-white mb-6">Skill Demand by Category</h2>
             {Object.entries(skillInsights).map(([category, skills]) => (
               <div key={category}>

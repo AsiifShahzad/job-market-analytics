@@ -1,0 +1,203 @@
+{
+  "timestamp": "2026-04-14T20:01:12.388155+00:00",
+  "data": {
+    "analytics": {
+      "skill_insights": {},
+      "trending_skills": [],
+      "salary_insights": {
+        "top_paying_skills": [],
+        "by_seniority": {
+          "lead": {
+            "median_salary": 196931.0,
+            "avg_salary": 180360.0,
+            "sample_size": 104
+          },
+          "unspecified": {
+            "median_salary": 127874.0,
+            "avg_salary": 132280.0,
+            "sample_size": 2162
+          }
+        }
+      },
+      "market_insights": {
+        "top_cities": [
+          {
+            "city": "Us",
+            "job_count": 177
+          },
+          {
+            "city": "New York City",
+            "job_count": 61
+          },
+          {
+            "city": "Pimmit",
+            "job_count": 47
+          },
+          {
+            "city": "Atlanta",
+            "job_count": 44
+          },
+          {
+            "city": "Charlotte",
+            "job_count": 44
+          },
+          {
+            "city": "California",
+            "job_count": 40
+          },
+          {
+            "city": "International",
+            "job_count": 35
+          },
+          {
+            "city": "Boston",
+            "job_count": 33
+          },
+          {
+            "city": "Washington",
+            "job_count": 33
+          },
+          {
+            "city": "Mc Lean",
+            "job_count": 28
+          }
+        ],
+        "top_countries": [
+          {
+            "country": "US",
+            "job_count": 274
+          },
+          {
+            "country": "Fairfax County",
+            "job_count": 118
+          },
+          {
+            "country": "Santa Clara County",
+            "job_count": 85
+          },
+          {
+            "country": "King County",
+            "job_count": 78
+          },
+          {
+            "country": "New York",
+            "job_count": 61
+          },
+          {
+            "country": "Fulton County",
+            "job_count": 56
+          },
+          {
+            "country": "Mecklenburg County",
+            "job_count": 44
+          },
+          {
+            "country": "San Mateo County",
+            "job_count": 40
+          },
+          {
+            "country": "Onondaga County",
+            "job_count": 38
+          },
+          {
+            "country": "Suffolk County",
+            "job_count": 38
+          }
+        ],
+        "remote_jobs": 220,
+        "total_jobs": 2400,
+        "remote_percentage": 9.17
+      },
+      "skill_combinations": [],
+      "actionable_insights": [],
+      "data_quality_report": {
+        "invalid_skills_removed": [
+          "azure",
+          "apache spark",
+          "postgresql",
+          "apache airflow",
+          "tensorflow",
+          "next.js",
+          "langchain",
+          "linux",
+          "tableau",
+          "github",
+          "vite",
+          "rust",
+          "webpack",
+          "elasticsearch",
+          "pytorch",
+          "aws",
+          "jenkins",
+          "machine learning",
+          "nginx",
+          "snowflake",
+          "redis",
+          "nlp",
+          "hugging face",
+          "java",
+          "sql",
+          "microservices",
+          "rest api",
+          "system design",
+          "go",
+          "generative ai",
+          "php",
+          "javascript",
+          "docker",
+          "angular",
+          "gitlab",
+          "dynamodb",
+          "mlops",
+          "django",
+          "postman",
+          "mysql",
+          "python",
+          "bigquery",
+          "git",
+          "r",
+          "graphql",
+          "computer vision",
+          "apache kafka",
+          "databricks",
+          "cassandra",
+          "prometheus",
+          "flask",
+          "dbt",
+          "grafana",
+          "vue",
+          "jest",
+          "assembly",
+          "terraform",
+          "google cloud",
+          "ansible",
+          "mongodb",
+          "kotlin",
+          "jira",
+          ".net",
+          "ci/cd",
+          "node.js",
+          "power bi",
+          "typescript",
+          "kubernetes",
+          "spring boot",
+          "react",
+          "c++",
+          "deep learning",
+          "fastapi",
+          "jquery",
+          "bash",
+          "scala"
+        ],
+        "invalid_locations_removed": [
+          "Grand Central"
+        ],
+        "low_sample_insights_filtered": false,
+        "jobs_before_cleaning": 2457,
+        "jobs_after_cleaning": 2400,
+        "skills_validated": 3,
+        "skills_removed_as_noise": 76
+      }
+    }
+  }
+}

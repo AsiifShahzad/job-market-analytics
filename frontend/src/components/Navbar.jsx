@@ -60,13 +60,13 @@ export function Navbar() {
 
         {/* Mobile Navigation */}
         {isMenuOpen && (
-          <div className="md:hidden pb-4 space-y-2 border-t border-slate-700">
+          <div className="md:hidden pb-3 sm:pb-4 space-y-1 sm:space-y-2 border-t border-slate-700">
             {navLinks.map((link) => (
               <Link
                 key={link.path}
                 to={link.path}
                 onClick={() => setIsMenuOpen(false)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
+                className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-3 rounded-lg transition text-sm sm:text-base ${
                   location.pathname === link.path
                     ? 'bg-blue-900 bg-opacity-30 text-blue-400 font-medium'
                     : 'text-slate-300 hover:bg-slate-700'

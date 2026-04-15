@@ -34,17 +34,17 @@ export default function SalaryInsights() {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 md:px-6 py-8">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-gray-50 px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8">
+      <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Salary Insights</h1>
-          <p className="text-gray-600">Average compensation by role title and skill premium analysis</p>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-1 sm:mb-2">Salary Insights</h1>
+          <p className="text-sm sm:text-base text-gray-600">Average compensation by role title and skill premium analysis</p>
         </div>
 
         {/* Job Title Filter */}
-        <div className="bg-white rounded-lg shadow p-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="bg-white rounded-lg shadow p-3 sm:p-4">
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
             Filter by Job Title
           </label>
           <select
@@ -54,7 +54,7 @@ export default function SalaryInsights() {
           >
             <option value="">All titles</option>
             {uniqueTitles.slice(0, 10).map((title) => (
-              <option key={title} value={title}>
+              <option key={title} value={title} className="text-gray-900">
                 {title}
               </option>
             ))}

@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npm run build",
+  "routes": [
+    {
+      "src": "/(?!api|assets|_next)(.*)",
+      "destination": "/index.html",
+      "status": 200
+    }
+  ]
+}

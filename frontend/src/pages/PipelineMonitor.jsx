@@ -55,9 +55,9 @@ export default function PipelineMonitor() {
         </div>
 
         {/* Info Banner */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="font-semibold text-blue-900 mb-2">Job Quality Validation</h3>
-          <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4\">
+          <h3 className="font-semibold text-sm sm:text-base text-blue-900 mb-2\">Job Quality Validation</h3>
+          <ul className="text-xs sm:text-sm text-blue-800 space-y-1 list-disc list-inside\">
             <li><strong>Filtered:</strong> Jobs rejected due to: being non-real listings (e.g., "system design"), missing required fields, insufficient description length, invalid title format, or duplicate detection</li>
             <li><strong>Inserted:</strong> Only verified real job postings from legitimate companies</li>
             <li>Each job is validated for: authentic job role keywords, minimum description quality, reasonable title length, and semantic uniqueness</li>
@@ -65,18 +65,18 @@ export default function PipelineMonitor() {
         </div>
 
         {/* Runs Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
+        <div className="bg-white rounded-lg shadow overflow-hidden\">
+          <div className="overflow-x-auto\">
+            <table className="w-full text-sm\">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Run ID</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Started</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Finished</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
-                  <th className="text-right py-3 px-4 font-semibold text-gray-700">Fetched</th>
-                  <th className="text-right py-3 px-4 font-semibold text-gray-700">Filtered</th>
-                  <th className="text-right py-3 px-4 font-semibold text-gray-700">Inserted</th>
+                  <th className=\"text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm text-gray-700\">Run ID</th>
+                  <th className=\"text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm text-gray-700\">Started</th>
+                  <th className=\"text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm text-gray-700\">Finished</th>
+                  <th className=\"text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm text-gray-700\">Status</th>
+                  <th className=\"text-right py-2 sm:py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm text-gray-700\">Fetched</th>
+                  <th className=\"text-right py-2 sm:py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm text-gray-700\">Filtered</th>
+                  <th className=\"text-right py-2 sm:py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm text-gray-700\">Inserted</th>
                 </tr>
               </thead>
               <tbody>

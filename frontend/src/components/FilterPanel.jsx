@@ -29,10 +29,10 @@ export const FilterPanel = ({ onClose, isOpen = true }) => {
   if (!isOpen) return null
 
   return (
-    <div className="w-full md:w-80 bg-slate-800 border-r border-slate-700 p-6 overflow-y-auto">
+    <div className="w-full md:w-80 bg-slate-800 border-r border-slate-700 p-4 sm:p-6 overflow-y-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+      <div className="flex items-center justify-between mb-4 sm:mb-6">
+        <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
           <FaSliders className="w-5 h-5" />
           Filters
         </h2>

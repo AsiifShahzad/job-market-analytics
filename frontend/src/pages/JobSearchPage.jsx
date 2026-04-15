@@ -55,8 +55,8 @@ export default function JobSearchPage() {
     <div className="min-h-screen bg-slate-900">
       <div className="flex flex-col md:flex-row h-full">
         {/* Mobile Filter Toggle */}
-        <div className="md:hidden sticky top-16 bg-slate-800 border-b border-slate-700 px-4 py-3 flex items-center justify-between z-10">
-          <h1 className="font-bold text-white">Job Search</h1>
+        <div className="md:hidden sticky top-16 bg-slate-800 border-b border-slate-700 px-3 sm:px-4 py-3 flex items-center justify-between z-10">
+          <h1 className="text-lg sm:text-xl font-bold text-white">Job Search</h1>
           <button
             onClick={() => setShowMobileFilters(!showMobileFilters)}
             className="p-2 hover:bg-slate-700 rounded-lg transition"

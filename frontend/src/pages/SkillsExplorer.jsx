@@ -49,13 +49,12 @@ export default function SkillsExplorer() {
         )}
 
         {/* Main Content */}
-        <div className="flex-1 px-4 md:px-0 py-6">
+        <div className="flex-1 px-3 sm:px-4 md:px-0 py-4 sm:py-6\">
           {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">Skills Explorer</h1>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4 sm:mb-6\">\n            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900\">Skills Explorer</h1>
             <button
               onClick={() => setMobileFilterOpen(true)}
-              className="md:hidden flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              className="md:hidden flex items-center gap-2 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg text-sm sm:text-base text-gray-700 hover:bg-gray-50"
             >
               <FaChevronDown className="w-4 h-4" />
               Filters
@@ -64,8 +63,8 @@ export default function SkillsExplorer() {
 
           {/* Skills Grid */}
           {isLoading ? (
-            <div className="flex justify-center py-12">
-              <FaSpinner className="w-8 h-8 animate-spin text-gray-400" />
+            <div className="flex justify-center py-8 sm:py-12">
+              <FaSpinner className="w-6 sm:w-8 h-6 sm:h-8 animate-spin text-gray-400\" />
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

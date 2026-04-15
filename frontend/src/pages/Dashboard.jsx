@@ -54,13 +54,13 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 px-4 md:px-6 py-8">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-slate-900 px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8">
+      <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
         {/* Header */}
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 sm:gap-0">
           <div>
-            <h1 className="text-4xl font-bold text-white">Dashboard</h1>
-            <p className="text-slate-300 mt-2">Monitor job market trends and skill demand</p>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white">Dashboard</h1>
+            <p className="text-sm sm:text-base text-slate-300 mt-1 sm:mt-2">Monitor job market trends and skill demand</p>
             <div className="mt-3 inline-block px-3 py-1 bg-blue-900 bg-opacity-30 border border-blue-700 rounded-full text-xs font-medium text-blue-300">
               ✓ Analyzed from verified real job listings
             </div>
@@ -75,7 +75,7 @@ export default function Dashboard() {
         </div>
 
         {/* Metrics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
           <MetricCard
             title="Total Jobs"
             value={formatNumber(totalJobs)}
@@ -97,7 +97,7 @@ export default function Dashboard() {
         </div>
 
         {/* CTA Banner */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg shadow-lg p-6 md:p-8 text-white">
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg shadow-lg p-4 sm:p-6 md:p-8 text-white">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold">Ready to Find Your Next Opportunity?</h2>

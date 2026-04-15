@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState, useMemo } from 'react'
-import { FaSpinner, FaArrowUp, FaDollarSign, FaMapPin, FaBolt, FaChartColumn } from 'react-icons/fa6'
+import { FaSpinner, FaArrowUp, FaDollarSign, FaMapPin, FaBolt, FaChartColumn, FaLightbulb } from 'react-icons/fa6'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import axios from 'axios'
 import { useInsightsSummary, useSkillsInsights, useSalaryInsights, useMarketInsights } from '@/api/hooks/useInsights'
@@ -16,34 +16,15 @@ export default function InsightsDashboard() {
   const { data: skillsData, isLoading: skillsLoading } = useSkillsInsights()
   const { data: salaryData, isLoading: salaryLoading } = useSalaryInsights()
   const { data: marketData, isLoading: marketLoading } = useMarketInsights()
-  
-  // Fetch analytics for top cities graph
-  const [analytics, setAnalytics] = useState(null)
-  const [analyticsLoading, setAnalyticsLoading] = useState(true)
 
-  useEffect(() => {
-    const fetchAnalytics = async () => {
-      try {
-        const response = await axios.get('/api/analytics/rigorous')
-        setAnalytics(response.data)
-        setAnalyticsLoading(false)
-      } catch (err) {
-        console.error('Failed to load analytics:', err)
-        setAnalyticsLoading(false)
-      }
-    }
-    fetchAnalytics()
-  }, [])
-
-  const isLoading = summaryLoading || skillsLoading || salaryLoading || marketLoading || analyticsLoading
+  const isLoading = summaryLoading || skillsLoading || salaryLoading || marketLoading
   
   // Calculate loading progress
   const loadingSteps = [
     { label: 'Loading insights...', active: summaryLoading },
     { label: 'Analyzing skills...', active: skillsLoading },
     { label: 'Processing salaries...', active: salaryLoading },
-    { label: 'Gathering market data...', active: marketLoading },
-    { label: 'Preparing visualizations...', active: analyticsLoading }
+    { label: 'Gathering market data...', active: marketLoading }
   ]
   
   const completedSteps = loadingSteps.filter(s => !s.active).length
@@ -52,8 +33,11 @@ export default function InsightsDashboard() {
   // Prevent chart re-creation by memoizing data
   
   const topCities = useMemo(
-    () => analytics?.market_insights?.top_cities || [],
-    [analytics?.market_insights?.top_cities]
+    () => marketData?.top_locations?.map(loc => ({
+      city: loc.city,
+      job_count: loc.job_count
+    })) || [],
+    [marketData?.top_locations]
   )
 
   return (
@@ -108,9 +92,9 @@ export default function InsightsDashboard() {
             <section className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl shadow-lg p-8">
               <div className="flex items-center gap-3 mb-6">
                 <FaBolt className="w-6 h-6" />
-                <h2 className="text-2xl font-bold">🔥 Key Insights</h2>
+                <h2 className="text-2xl font-bold">Key Insights</h2>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
                 {summary?.actionable_insights?.length > 0 ? (
                   summary.actionable_insights.slice(0, 4).map((insight, idx) => (
                     <div key={idx} className="bg-white bg-opacity-10 backdrop-blur rounded-lg p-4">
@@ -127,7 +111,7 @@ export default function InsightsDashboard() {
             <section className="bg-slate-800 border border-slate-700 rounded-lg shadow p-6">
               <div className="flex items-center gap-3 mb-6">
                 <FaChartColumn className="w-6 h-6 text-blue-400" />
-                <h2 className="text-2xl font-bold text-white">📊 Skill Demand</h2>
+                <h2 className="text-2xl font-bold text-white">Skill Demand</h2>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -159,7 +143,7 @@ export default function InsightsDashboard() {
 
                 {/* Trending Skills */}
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-200 mb-4">📈 Trending Skills</h3>
+                  <h3 className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2"><FaArrowUp className="w-5 h-5 text-green-400" />Trending Skills</h3>
                   <div className="space-y-3">
                     {skillsData?.trending_skills?.length > 0 ? (
                       skillsData.trending_skills.map((skill, idx) => (
@@ -189,7 +173,7 @@ export default function InsightsDashboard() {
             <section className="bg-slate-800 border border-slate-700 rounded-lg shadow p-6">
               <div className="flex items-center gap-3 mb-6">
                 <FaDollarSign className="w-6 h-6 text-green-400" />
-                <h2 className="text-2xl font-bold text-white">💰 Salary Insights</h2>
+                <h2 className="text-2xl font-bold text-white">Salary Insights</h2>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -258,13 +242,13 @@ export default function InsightsDashboard() {
             <section className="bg-slate-800 border border-slate-700 rounded-lg shadow p-6">
               <div className="flex items-center gap-3 mb-6">
                 <FaMapPin className="w-6 h-6 text-red-400" />
-                <h2 className="text-2xl font-bold text-white">🌍 Market Overview</h2>
+                <h2 className="text-2xl font-bold text-white">Market Overview</h2>
               </div>
 
               {/* Top Cities Graph */}
-              {analytics?.market_insights?.top_cities && (
+              {topCities.length > 0 && (
                 <div className="mb-8">
-                  <h3 className="text-lg font-semibold text-white mb-4">🏙️ Top Cities</h3>
+                  <h3 className="text-lg font-semibold text-white mb-4">Top Cities by Job Postings</h3>
                   <div className="bg-slate-700 bg-opacity-50 rounded-lg p-4">
                     <ResponsiveContainer width="100%" height={450}>
                       <BarChart data={topCities} margin={{ top: 20, right: 30, left: 0, bottom: 100 }}>
@@ -337,9 +321,10 @@ export default function InsightsDashboard() {
             </section>
 
             {/* Data Quality Notice */}
-            <div className="bg-yellow-900 border border-yellow-700 rounded-lg p-4 text-sm text-yellow-300">
+            <div className="bg-yellow-900 border border-yellow-700 rounded-lg p-4 text-sm text-yellow-300 flex items-center gap-3">
+              <FaLightbulb className="w-5 h-5 flex-shrink-0" />
               <p>
-                💡 <strong>Tips for best insights:</strong> Run the pipeline multiple times to collect more data. Insights are based on verified job listings from the last 30 days.
+                <strong>Tips for best insights:</strong> Run the pipeline multiple times to collect more data. Insights are based on verified job listings from the last 30 days.
               </p>
             </div>
           </>
