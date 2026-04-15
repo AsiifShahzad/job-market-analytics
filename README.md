@@ -1,182 +1,53 @@
-# Job Market Analytics Platform
+# JobPulse AI
 
-> Automated pipeline that extracts real-time job market trends, in-demand skills, and salary signals from 50K+ live records — reducing manual analysis time by 70%.
+A comprehensive job market intelligence platform that analyzes real job postings to uncover skills demand, salary trends, and hiring insights.
 
-[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat&logo=python&logoColor=white)](https://python.org)
-
-[![Status](https://img.shields.io/badge/Status-Production-brightgreen?style=flat)]()
-
-[![Records](https://img.shields.io/badge/Data-50K%2B%20Records-blue?style=flat)]()
+Live Demo: https://job-market-analytics-omega.vercel.app/
 
 ---
 
-## Problem Statement
+## Problem
 
-Job seekers and analysts waste hours manually scanning job boards to identify trending roles, required skills, and salary benchmarks. This platform automates the entire pipeline — from raw data collection to actionable visual insights — in a fully repeatable, scalable way.
-
----
-
-## Key Results
-
-| Metric | Result |
-
-|--------|--------|
-
-| Records processed | 50,000+ live job listings |
-
-| Manual analysis time saved | 70% reduction |
-
-| Skills extracted (NLP) | 200+ unique technical skills ranked |
-
-| Data sources | Multiple job boards (CSV + SQL) |
+Job seekers, career coaches, and HR professionals lack structured insights into what skills employers actually want, what they're willing to pay, and where the best opportunities are. Job boards show individual listings, but no one provides actionable, data-driven market intelligence across thousands of verified job postings.
 
 ---
 
-## System Architecture
+## Impact
 
-```
+- Analyzes 10,000+ verified, deduplicated job postings in real time
+- Extracts skills demand, salary benchmarks, and hiring patterns from raw job data
+- Provides trend analysis — week-over-week growth rates for emerging skills
+- Breaks down compensation by experience level, remote status, and location
+- Streams pipeline execution so users watch data collection and validation happen live
 
-Raw Job Data (CSV/SQL)
+---
 
-        │
+## Solution
 
-        ▼
+A full-stack platform with an ETL pipeline backend and an interactive React frontend.
 
-┌─────────────────┐
+The backend runs a multi-stage data pipeline: fetch jobs from Adzuna API, validate for authenticity (filters fake listings and low-quality postings), extract skills using NLP, and compute analytics with a 70-hour intelligent cache. The frontend displays dashboards for job search, skill trends, salary insights, and market overview — with real-time pipeline monitoring so users can trigger new data runs and track completion.
 
-│  Data Ingestion │  ← Scraping / CSV import / SQL queries
-
-└────────┬────────┘
-
-         │
-
-         ▼
-
-┌─────────────────┐
-
-│  Data Cleaning  │  ← Deduplication, null handling, normalization
-
-└────────┬────────┘
-
-         │
-
-         ▼
-
-┌──────────────────────┐
-
-│  NLP Feature Extract │  ← Skill extraction, role classification, salary parsing
-
-└────────┬─────────────┘
-
-         │
-
-         ▼
-
-┌─────────────────┐
-
-│  Analytics Engine│  ← Trend analysis, ranking, aggregations
-
-└────────┬────────┘
-
-         │
-
-         ▼
-
-┌─────────────────┐
-
-│  Dashboard/Report│  ← Power BI / Matplotlib visualizations
-
-└─────────────────┘
-
-```
+Every analysis returns skill demand rankings, trending skills with growth rates, salary insights by role and experience level, remote vs. on-site compensation analysis, top hiring cities, and market distribution by seniority.
 
 ---
 
 ## Tech Stack
 
-| Layer | Tools |
+**Backend:** FastAPI · SQLAlchemy · PostgreSQL (Neon) · Adzuna API · NLP (spaCy) · Pydantic · Structlog
 
-|-------|-------|
+**Frontend:** React 18 · Vite · Tailwind CSS · Recharts · React Router · TanStack Query · Zustand
 
-| Data Collection | Python, BeautifulSoup / Scrapy, SQL |
+**Icons & UI:** React Icons (Font Awesome 6) · Responsive Design
 
-| Processing | Pandas, NumPy |
+**Deployment:** Render (backend) · Vercel (frontend)
 
-| NLP | spaCy / regex-based skill extractor |
-
-| Storage | PostgreSQL / SQLite |
-
-| Visualization | Power BI, Matplotlib, Seaborn |
-
-| Environment | Python 3.10+, virtualenv |
+**Database:** Neon PostgreSQL with async support
 
 ---
 
-## Features
-
-- **Automated ingestion** — loads job data from CSV exports or direct SQL queries
-
-- **Skill frequency ranking** — extracts and ranks 200+ technical skills by demand
-
-- **Role trend analysis** — identifies fastest-growing job titles over time
-
-- **Salary parsing** — normalizes salary ranges across formats
-
-- **Interactive dashboard** — Power BI report with slicers by location, role, and skill
-
-- **Repeatable pipeline** — single command reruns full analysis on fresh data
-
----
-
-## Setup & Usage
-
-```bash
-
-# 1. Clone the repo
-
-git clone https://github.com/asiifshahzad/job-market-analytics.git
-
-cd job-market-analytics
-
-# 2. Create virtual environment
-
-python -m venv venv
-
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# 3. Install dependencies
-
-pip install -r requirements.txt
-
-# 4. Add your data
-
-# Place CSV files in data/raw/ or configure SQL connection in src/ingest.py
-
-# 5. Run the pipeline
-
-python src/ingest.py
-
-python src/clean.py
-
-python src/analyze.py
-
-```
-
----
-
-## Sample Insights
-
-- **Top 5 in-demand skills:** Python, SQL, Machine Learning, Power BI, Docker
-
-- **Fastest growing role:** AI/ML Engineer (+38% YoY in listings)
-
-- **Avg. salary range (ML roles):** PKR 150K–350K/month
-
----
-
-## 👤 Author
+## Author
 
 **Asif Shahzad** — AI/ML Engineer  
-
-[Portfolio](https://asiifshahzad.vercel.app/) · [LinkedIn](https://www.linkedin.com/in/asiifshahzad) · [Email](mailto:shahzadasif041@gmail.com)
+[Portfolio](https://asiifshahzad.vercel.app) · [LinkedIn](https://www.linkedin.com/in/asiifshahzad) · [Email](mailto:shahzadasif041@gmail.com)
 
